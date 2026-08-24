@@ -1088,7 +1088,6 @@ function renderIntroForm() {
     <button class="secondary" id="reviewBtn">📝 복습하기 (틀렸던 문제 다시 풀기)</button>
     <button class="secondary" id="teacherBtn">선생님 모드 (전체 학생 현황)</button>
     <button class="secondary" id="typeTestBtn">문항유형별 진단 (18~30번대, 선택)</button>
-    <button class="secondary" id="apiTestBtn">🔧 실시간 생성 테스트 (개발용)</button>
   </div>`;
   const doLookup = async () => {
     const nameEl2 = document.getElementById('lookupNameInput');
@@ -1177,7 +1176,6 @@ function renderIntroForm() {
   };
   document.getElementById('teacherBtn').onclick = renderTeacherView;
   document.getElementById('typeTestBtn').onclick = () => { typeTestIdx = 0; typeTestLog = []; renderTypeTest(); };
-  document.getElementById('apiTestBtn').onclick = runApiTest;
 }
 
 async function renderDifficultyStats() {
