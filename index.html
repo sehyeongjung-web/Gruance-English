@@ -1086,9 +1086,9 @@ function renderIntroForm() {
     <button class="primary" id="startBtn">시작하기</button>
     <button class="secondary" id="resumeBtn">↻ 저장된 진행 이어하기</button>
     <button class="secondary" id="reviewBtn">📝 복습하기 (틀렸던 문제 다시 풀기)</button>
-    <button class="secondary" id="teacherBtn">선생님 모드 (전체 학생 현황)</button>
-    <button class="secondary" id="typeTestBtn">문항유형별 진단 (18~30번대, 선택)</button>
+    ${isTeacherAccess ? '<button class="secondary" id="teacherBtn">선생님 모드</button>' : ''}
   </div>`;
+  if (isTeacherAccess) document.getElementById('teacherBtn').onclick = renderTeacherView;
   const doLookup = async () => {
     const nameEl2 = document.getElementById('lookupNameInput');
     const resultArea = document.getElementById('lookupResultArea');
@@ -1174,8 +1174,6 @@ function renderIntroForm() {
       renderStartLevelPicker();
     }
   };
-  document.getElementById('teacherBtn').onclick = renderTeacherView;
-  document.getElementById('typeTestBtn').onclick = () => { typeTestIdx = 0; typeTestLog = []; renderTypeTest(); };
 }
 
 async function renderDifficultyStats() {
@@ -1313,6 +1311,13 @@ function renderDiffStatsView(mode) {
 }
 
 async function renderTeacherView() {
+  const pw = prompt('선생님 모드 비밀번호를 입력하세요.');
+  if (pw === null) { render(); return; } // 취소 누르면 원래 화면으로
+  if (pw !== TEACHER_PASSWORD) {
+    alert('비밀번호가 틀렸습니다.');
+    render();
+    return;
+  }
   const app = document.getElementById('app');
   app.innerHTML = `<div class="card"><p style="font-size:13px;color:#6B7280;">불러오는 중...</p></div>`;
 
@@ -2169,6 +2174,16 @@ async function renderFinal(app) {
 // 아래 URL을 구글 앱스크립트 배포 후 받은 웹앱 URL로 교체하세요.
 // (비워두면 이 기능은 자동으로 건너뜁니다.)
 const GOOGLE_SHEET_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxDOZbcQhJa72ROS23_el4w1_430ipHJWQ7IS74yUwiksWFsvJhrCHSSAfFiD_9gWhJkg/exec";
+// 선생님 모드 비밀번호. 학생이 실수로 누르거나 호기심에 눌러도 전체 학생 데이터가 보이지 않도록 막는 최소한의 장치입니다.
+// 원하시는 비밀번호로 아래 따옴표 안 내용만 바꾸시면 됩니다 (예: "TEACHER_PASSWORD = "0000";").
+const TEACHER_PASSWORD = "gruance2026";
+// 선생님 모드 "버튼 자체"를 학생 화면에서 숨기기 위한 비밀 주소용 토큰입니다.
+// 선생님은 평소 링크 끝에 "?admin=아래토큰값"을 붙인 주소로 들어오시면 버튼이 보입니다.
+// 예: https://내주소/index.html?admin=grouance-teacher-key
+// 학생에게 보내는 일반 링크에는 이 부분을 절대 붙이지 않으면, 학생 화면에는 버튼이 아예 나타나지 않습니다.
+// 이 토큰값도 TEACHER_PASSWORD와 마찬가지로 원하시는 값으로 바꾸실 수 있습니다.
+const TEACHER_ACCESS_TOKEN = "grouance-teacher-key";
+const isTeacherAccess = new URLSearchParams(window.location.search).get('admin') === TEACHER_ACCESS_TOKEN;
 
 async function logToGoogleSheet(profile) {
   if (!GOOGLE_SHEET_WEBHOOK_URL) return; // URL 미설정 시 조용히 건너뜀
