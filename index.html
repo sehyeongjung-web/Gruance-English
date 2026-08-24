@@ -207,80 +207,7 @@ const REASON_BANK = {
 };
 
 // ===== 어휘력축 (영어, 레벨당 5문항) =====
-const VOCAB_BANK = {
-  1:[["school","He goes to school every day.","① 학교 ② 병원 ③ 공원 ④ 시장 ⑤ 교회"],
-     ["place","This is a good place to rest.","① 장소 ② 시간 ③ 사람 ④ 이유 ⑤ 방법"],
-     ["number","Write down the number.","① 숫자 ② 이름 ③ 색깔 ④ 모양 ⑤ 소리"],
-     ["someone","Someone is calling you.","① 누군가 ② 아무도 ③ 모든 사람 ④ 아무것도 ⑤ 언제나"],
-     ["always","She is always kind.","① 항상 ② 가끔 ③ 결코 ④ 거의 ⑤ 한때"],
-     ["friend","She met her friend at the park.","① 친구 ② 선생님 ③ 이웃 ④ 손님 ⑤ 가족"],
-     ["water","He drank a glass of water.","① 물 ② 우유 ③ 주스 ④ 커피 ⑤ 차"],
-     ["house","They live in a small house.","① 집 ② 학교 ③ 병원 ④ 상점 ⑤ 공원"]],
-  2:[["individual","Every individual has different needs.","① 개인 ② 단체 ③ 기계 ④ 동물 ⑤ 식물"],
-     ["previous","She always double-checks her previous work.","① 이전의 ② 미래의 ③ 현재의 ④ 특별한 ⑤ 일반적인"],
-     ["characteristic","Honesty is an important characteristic to have.","① 특징 ② 의무 ③ 습관 ④ 규칙 ⑤ 목표"],
-     ["advantage","Good sleep gives you an advantage the next day.","① 이점 ② 단점 ③ 위험 ④ 의무 ⑤ 규칙"],
-     ["response","He gave a quick response to the question.","① 응답 ② 질문 ③ 침묵 ④ 거부 ⑤ 소음"],
-     ["opportunity","This job offers a great opportunity.","① 기회 ② 위험 ③ 의무 ④ 규칙 ⑤ 실수"],
-     ["benefit","Exercise has many health benefits.","① 이점 ② 위험 ③ 비용 ④ 규칙 ⑤ 실수"],
-     ["reliable","She is a reliable friend.","① 믿을 수 있는 ② 위험한 ③ 게으른 ④ 낯선 ⑤ 불친절한"]],
-  3:[["approach","Scientists tried a new approach to solve the problem.","① 접근법 ② 결과 ③ 실패 ④ 질문 ⑤ 소음"],
-     ["factor","Weather is one factor that affects the harvest.","① 요인 ② 결과 ③ 질문 ④ 규칙 ⑤ 소음"],
-     ["significant","This is a significant improvement over last year.","① 상당한 ② 사소한 ③ 일시적인 ④ 불가능한 ⑤ 위험한"],
-     ["attitude","Her attitude toward work changed after the trip.","① 태도 ② 능력 ③ 습관 ④ 규칙 ⑤ 목표"],
-     ["circumstance","Under the circumstances, canceling the trip made sense.","① 상황 ② 규칙 ③ 목표 ④ 의무 ⑤ 습관"],
-     ["consequence","Every action has a consequence.","① 결과 ② 원인 ③ 방법 ④ 이유 ⑤ 목적"],
-     ["perspective","Try to see it from her perspective.","① 관점 ② 결과 ③ 규칙 ④ 목표 ⑤ 실수"],
-     ["evaluate","Teachers evaluate student progress regularly.","① 평가하다 ② 무시하다 ③ 숨기다 ④ 만들다 ⑤ 파괴하다"]],
-  4:[["percentage","A large percentage of students agreed.","① 비율 ② 숫자 ③ 순서 ④ 이름 ⑤ 종류"],
-     ["immediate","They took immediate action.","① 즉각적인 ② 지연된 ③ 신중한 ④ 불필요한 ⑤ 선택적인"],
-     ["techniques","He learned new techniques.","① 기술 ② 규칙 ③ 이유 ④ 결과 ⑤ 문제"],
-     ["complicated","The situation became complicated.","① 복잡한 ② 단순한 ③ 명확한 ④ 안정적인 ⑤ 즐거운"],
-     ["visual","Visual aids help learning.","① 시각적인 ② 청각적인 ③ 언어적인 ④ 신체적인 ⑤ 이론적인"],
-     ["sufficient","We have sufficient food for the trip.","① 충분한 ② 부족한 ③ 과도한 ④ 불필요한 ⑤ 위험한"],
-     ["potential","She has great potential as a leader.","① 잠재력 ② 약점 ③ 실패 ④ 습관 ⑤ 규칙"],
-     ["alternative","They looked for an alternative solution.","① 대안 ② 원인 ③ 결과 ④ 문제 ⑤ 규칙"]],
-  5:[["creativity","The job requires creativity.","① 창의성 ② 정확성 ③ 인내심 ④ 신속함 ⑤ 겸손함"],
-     ["dilemma","She faced a difficult dilemma.","① 딜레마 ② 확신 ③ 성공 ④ 해결책 ⑤ 기회"],
-     ["assumption","His assumption turned out to be wrong.","① 가정 ② 결론 ③ 사실 ④ 증거 ⑤ 규칙"],
-     ["enhance","This will enhance the quality.","① 향상시키다 ② 저하시키다 ③ 유지하다 ④ 없애다 ⑤ 숨기다"],
-     ["evolved","The system has evolved over time.","① 진화하다 ② 정지하다 ③ 사라지다 ④ 반복하다 ⑤ 축소되다"],
-     ["controversy","The decision caused public controversy.","① 논란 ② 합의 ③ 침묵 ④ 축하 ⑤ 무관심"],
-     ["implication","Consider the implications of this choice.","① 함의 ② 결론 ③ 사실 ④ 증거 ⑤ 규칙"],
-     ["undermine","Doubt can undermine confidence.","① 약화시키다 ② 강화시키다 ③ 유지하다 ④ 만들다 ⑤ 숨기다"]],
-  6:[["indifferent","He seemed indifferent to the result.","① 무관심한 ② 열정적인 ③ 분노한 ④ 만족한 ⑤ 불안한"],
-     ["unfamiliar","The place looked unfamiliar to her.","① 낯선 ② 익숙한 ③ 편안한 ④ 위험한 ⑤ 아름다운"],
-     ["adaptive","This is an adaptive strategy.","① 적응적인 ② 고정된 ③ 무작위의 ④ 일시적인 ⑤ 반복적인"],
-     ["commute","His daily commute takes an hour.","① 통근 ② 여행 ③ 이사 ④ 산책 ⑤ 회의"],
-     ["contexts","Words can mean differently in different contexts.","① 맥락 ② 발음 ③ 철자 ④ 문법 ⑤ 어순"],
-     ["ambiguous","His answer was ambiguous.","① 모호한 ② 명확한 ③ 정직한 ④ 확실한 ⑤ 간단한"],
-     ["reluctant","She was reluctant to leave.","① 꺼리는 ② 기꺼운 ③ 확신하는 ④ 자랑스러운 ⑤ 만족한"],
-     ["presumably","Presumably, he forgot the meeting.","① 아마도 ② 확실히 ③ 절대로 ④ 즉시 ⑤ 결코"]],
-  7:[["distinguishes","This feature distinguishes humans from animals.","① 구별하다 ② 결합하다 ③ 혼동하다 ④ 무시하다 ⑤ 반복하다"],
-     ["biologists","Biologists study living things.","① 생물학자 ② 물리학자 ③ 역사학자 ④ 경제학자 ⑤ 언어학자"],
-     ["inorganic","Inorganic materials do not come from living things.","① 무기물의 ② 유기물의 ③ 인공적인 ④ 자연적인 ⑤ 재활용된"],
-     ["primates","Primates include monkeys and apes.","① 영장류 ② 파충류 ③ 조류 ④ 곤충류 ⑤ 어류"],
-     ["envious","She felt envious of her friend's success.","① 부러워하는 ② 자랑스러운 ③ 무관심한 ④ 동정하는 ⑤ 실망한"],
-     ["meticulous","She is meticulous about details.","① 꼼꼼한 ② 부주의한 ③ 게으른 ④ 느긋한 ⑤ 무관심한"],
-     ["paradox","It's a paradox that less can be more.","① 역설 ② 사실 ③ 규칙 ④ 결론 ⑤ 원인"],
-     ["inevitable","Change is inevitable in life.","① 불가피한 ② 피할 수 있는 ③ 불필요한 ④ 선택적인 ⑤ 일시적인"]],
-  8:[["perceiving","Perceiving danger, he stopped immediately.","① 인지하다 ② 무시하다 ③ 창조하다 ④ 예측 실패하다 ⑤ 잊어버리다"],
-     ["confining","The small room felt confining.","① 답답하게 가두는 ② 자유롭게 하는 ③ 편안하게 하는 ④ 넓어지는 ⑤ 개방적인"],
-     ["uneasiness","A sense of uneasiness filled the room.","① 불안감 ② 안도감 ③ 자신감 ④ 만족감 ⑤ 지루함"],
-     ["necessitate","This problem will necessitate a new approach.","① 필요하게 만들다 ② 불필요하게 만들다 ③ 금지하다 ④ 허용하다 ⑤ 무시하다"],
-     ["intonation","Her intonation revealed her surprise.","① 억양 ② 어휘 ③ 문법 ④ 철자 ⑤ 발음기호"],
-     ["ostensibly","He was ostensibly busy, but actually idle.","① 표면상으로 ② 실제로 ③ 확실히 ④ 결코 ⑤ 즉시"],
-     ["circumvent","They tried to circumvent the rules.","① 회피하다 ② 준수하다 ③ 만들다 ④ 발표하다 ⑤ 무시당하다"],
-     ["exacerbate","Stress can exacerbate health problems.","① 악화시키다 ② 개선하다 ③ 유지하다 ④ 예방하다 ⑤ 치료하다"]],
-  9:[["outpace","Demand began to outpace supply.","① 앞지르다 ② 뒤처지다 ③ 동일해지다 ④ 사라지다 ⑤ 무관해지다"],
-     ["survivorship","The study focused on survivorship rates.","① 생존율 ② 사망률 ③ 출생률 ④ 이혼율 ⑤ 취업률"],
-     ["frivolity","Adults often avoid frivolity in public.","① 경박함 ② 진지함 ③ 성실함 ④ 우아함 ⑤ 침착함"],
-     ["disproportionate","The reward was disproportionate to the effort.","① 균형이 맞지 않는 ② 정확히 비례하는 ③ 예상 가능한 ④ 공평하게 나눠진 ⑤ 즉각적인"],
-     ["unequivocal","Her support was unequivocal.","① 명백한 ② 애매모호한 ③ 조건부의 ④ 소극적인 ⑤ 일시적인"],
-     ["ephemeral","Fame can be ephemeral.","① 덧없는 ② 영원한 ③ 확실한 ④ 강력한 ⑤ 안정적인"],
-     ["juxtapose","The artist juxtaposed old and new styles.","① 나란히 놓다 ② 분리하다 ③ 없애다 ④ 숨기다 ⑤ 무시하다"],
-     ["vindicate","The evidence vindicated her claim.","① 정당성을 입증하다 ② 반박하다 ③ 무시하다 ④ 은폐하다 ⑤ 왜곡하다"]]
-};
+const VOCAB_BANK = {"1":[["school","He goes to school every day.","① 학교 ② 병원 ③ 공원 ④ 시장 ⑤ 교회"],["place","This is a good place to rest.","① 장소 ② 시간 ③ 사람 ④ 이유 ⑤ 방법"],["number","Write down the number.","① 숫자 ② 이름 ③ 색깔 ④ 모양 ⑤ 소리"],["someone","Someone is calling you.","① 누군가 ② 아무도 ③ 모든 사람 ④ 아무것도 ⑤ 언제나"],["always","She is always kind.","① 항상 ② 가끔 ③ 결코 ④ 거의 ⑤ 한때"],["friend","She met her friend at the park.","① 친구 ② 선생님 ③ 이웃 ④ 손님 ⑤ 가족"],["water","He drank a glass of water.","① 물 ② 우유 ③ 주스 ④ 커피 ⑤ 차"],["house","They live in a small house.","① 집 ② 학교 ③ 병원 ④ 상점 ⑤ 공원"]],"2":[["individual","Every individual has different needs.","① 개인 ② 단체 ③ 기계 ④ 동물 ⑤ 식물"],["previous","She always double-checks her previous work.","① 이전의 ② 미래의 ③ 현재의 ④ 특별한 ⑤ 일반적인"],["characteristic","Honesty is an important characteristic to have.","① 특징 ② 의무 ③ 습관 ④ 규칙 ⑤ 목표"],["advantage","Good sleep gives you an advantage the next day.","① 이점 ② 단점 ③ 위험 ④ 의무 ⑤ 규칙"],["response","He gave a quick response to the question.","① 응답 ② 질문 ③ 침묵 ④ 거부 ⑤ 소음"],["opportunity","This job offers a great opportunity.","① 기회 ② 위험 ③ 의무 ④ 규칙 ⑤ 실수"],["benefit","Exercise has many health benefits.","① 이점 ② 위험 ③ 비용 ④ 규칙 ⑤ 실수"],["reliable","She is a reliable friend.","① 믿을 수 있는 ② 위험한 ③ 게으른 ④ 낯선 ⑤ 불친절한"]],"3":[["approach","Scientists tried a new approach to solve the problem.","① 접근법 ② 결과 ③ 실패 ④ 질문 ⑤ 소음"],["factor","Weather is one factor that affects the harvest.","① 요인 ② 결과 ③ 질문 ④ 규칙 ⑤ 소음"],["significant","This is a significant improvement over last year.","① 상당한 ② 사소한 ③ 일시적인 ④ 불가능한 ⑤ 위험한"],["attitude","Her attitude toward work changed after the trip.","① 태도 ② 능력 ③ 습관 ④ 규칙 ⑤ 목표"],["circumstance","Under the circumstances, canceling the trip made sense.","① 상황 ② 규칙 ③ 목표 ④ 의무 ⑤ 습관"],["consequence","Every action has a consequence.","① 결과 ② 원인 ③ 방법 ④ 이유 ⑤ 목적"],["perspective","Try to see it from her perspective.","① 관점 ② 결과 ③ 규칙 ④ 목표 ⑤ 실수"],["evaluate","Teachers evaluate student progress regularly.","① 평가하다 ② 무시하다 ③ 숨기다 ④ 만들다 ⑤ 파괴하다"]],"4":[["notion","The notion that money buys happiness is widely debated.","① 개념/생각 ② 증거 ③ 결과 ④ 의무 ⑤ 습관"],["arbitrary","The rule seemed arbitrary and unfair to most students.","① 임의적인 ② 합리적인 ③ 엄격한 ④ 일시적인 ⑤ 공식적인"],["plausible","Her explanation sounded plausible to the committee.","① 그럴듯한 ② 불가능한 ③ 모호한 ④ 반복적인 ⑤ 무관한"],["prevalent","This disease is prevalent in many developing countries.","① 널리 퍼진 ② 희귀한 ③ 치명적인 ④ 일시적인 ⑤ 알려지지 않은"],["coincide","Her vacation happened to coincide with the festival.","① 동시에 일어나다 ② 충돌하다 ③ 연기되다 ④ 취소되다 ⑤ 반복되다"],["distinct","The two proposals are distinct in their approach.","① 뚜렷이 다른 ② 비슷한 ③ 불분명한 ④ 연관된 ⑤ 동일한"],["integrate","The school tried to integrate new technology into lessons.","① 통합하다 ② 제거하다 ③ 분리하다 ④ 축소하다 ⑤ 연기하다"],["underlying","The underlying cause of the conflict was economic.","① 근본적인 ② 표면적인 ③ 일시적인 ④ 무관한 ⑤ 부수적인"]],"5":[["discrepancy","There was a discrepancy between the two reports.","① 불일치 ② 일치 ③ 증가 ④ 반복 ⑤ 요약"],["ambiguous","The instructions were ambiguous and confused everyone.","① 애매모호한 ② 명확한 ③ 간단한 ④ 엄격한 ⑤ 일관된"],["presumably","Presumably, the meeting will be rescheduled soon.","① 아마도 ② 분명히 ③ 절대로 ④ 다행히 ⑤ 마침내"],["reluctant","He was reluctant to share his opinion in public.","① 꺼리는 ② 열망하는 ③ 자신있는 ④ 무관심한 ⑤ 익숙한"],["skeptical","Many scientists remained skeptical of the new theory.","① 회의적인 ② 확신하는 ③ 무관심한 ④ 우호적인 ⑤ 순진한"],["inherent","Risk is inherent in almost every investment.","① 내재된 ② 외부적인 ③ 일시적인 ④ 우연한 ⑤ 부수적인"],["articulate","She was able to articulate her ideas clearly.","① 명확히 표현하다 ② 숨기다 ③ 단순화하다 ④ 반박하다 ⑤ 무시하다"],["coherent","The essay lacked a coherent structure.","① 일관된 ② 복잡한 ③ 화려한 ④ 독창적인 ⑤ 간결한"]],"6":[["paradox","It is a paradox that saving time can waste money.","① 역설 ② 증거 ③ 해결책 ④ 원인 ⑤ 결과"],["inevitable","Change was inevitable given the circumstances.","① 불가피한 ② 선택적인 ③ 우연한 ④ 일시적인 ⑤ 이례적인"],["meticulous","The scientist kept meticulous records of every trial.","① 세심한 ② 부주의한 ③ 신속한 ④ 즉흥적인 ⑤ 단순한"],["indifferent","He remained indifferent to the criticism he received.","① 무관심한 ② 민감한 ③ 적대적인 ④ 열정적인 ⑤ 호기심 많은"],["adaptive","Humans have developed adaptive strategies to survive change.","① 적응력 있는 ② 고정된 ③ 비효율적인 ④ 일시적인 ⑤ 위험한"],["envious","She felt envious of her friend's success.","① 부러워하는 ② 자랑스러운 ③ 무관심한 ④ 동정하는 ⑤ 실망한"],["momentum","The campaign gained momentum after the speech.","① 추진력 ② 저항 ③ 혼란 ④ 의심 ⑤ 피로"],["unfamiliar","The students found the topic completely unfamiliar.","① 낯선 ② 익숙한 ③ 흥미로운 ④ 단순한 ⑤ 중요한"]],"7":[["circumvent","The company found a way to circumvent the regulation.","① 회피하다 ② 준수하다 ③ 공개하다 ④ 강화하다 ⑤ 보고하다"],["exacerbate","Poor sleep can exacerbate stress levels.","① 악화시키다 ② 완화하다 ③ 예방하다 ④ 측정하다 ⑤ 무시하다"],["ostensibly","The meeting was ostensibly about budget cuts.","① 표면상으로는 ② 분명히 ③ 은밀하게 ④ 우연히 ⑤ 즉시"],["necessitate","The damage will necessitate immediate repairs.","① 필요하게 만들다 ② 방지하다 ③ 연기하다 ④ 축소하다 ⑤ 무효화하다"],["perpetuate","The policy may perpetuate existing inequalities.","① 영속시키다 ② 해결하다 ③ 드러내다 ④ 완화하다 ⑤ 조사하다"],["discern","It was hard to discern the truth from rumors.","① 분별하다 ② 무시하다 ③ 날조하다 ④ 과장하다 ⑤ 반복하다"],["substantiate","The lawyer failed to substantiate the claim.","① 입증하다 ② 반박하다 ③ 은폐하다 ④ 축소하다 ⑤ 제안하다"],["refute","The scientist refuted the earlier study's conclusion.","① 반박하다 ② 입증하다 ③ 지지하다 ④ 인용하다 ⑤ 요약하다"]],"8":[["unequivocal","Her answer was unequivocal: she would not resign.","① 명백한 ② 애매한 ③ 일시적인 ④ 조건부의 ⑤ 비공식적인"],["disproportionate","The fine seemed disproportionate to the minor offense.","① 불균형한 ② 공정한 ③ 일관된 ④ 합리적인 ⑤ 예측 가능한"],["ephemeral","Fame in this industry is often ephemeral.","① 일시적인 ② 영구적인 ③ 점진적인 ④ 확실한 ⑤ 의도적인"],["juxtapose","The exhibit juxtaposes old photographs with new ones.","① 나란히 놓다 ② 분리하다 ③ 제거하다 ④ 단순화하다 ⑤ 은폐하다"],["vindicate","New evidence eventually vindicated his claims.","① 정당성을 입증하다 ② 무효화하다 ③ 비난하다 ④ 의심하다 ⑤ 축소하다"],["corroborate","Witnesses corroborated the driver's account of the accident.","① 뒷받침하다 ② 반박하다 ③ 날조하다 ④ 무시하다 ⑤ 은폐하다"],["contentious","Immigration remains a contentious political issue.","① 논쟁의 여지가 있는 ② 합의된 ③ 사소한 ④ 명백한 ⑤ 일반적인"],["notwithstanding","Notwithstanding the criticism, she continued her research.","① ~에도 불구하고 ② ~때문에 ③ ~에 관하여 ④ ~을 제외하고 ⑤ ~을 대신하여"]],"9":[["nuance","A good translator captures every nuance of meaning.","① 미묘한 차이 ② 명백한 차이 ③ 전체 요약 ④ 공통점 ⑤ 반복"],["paradigm","The discovery led to a new scientific paradigm.","① 패러다임/틀 ② 오류 ③ 가설 ④ 결론 ⑤ 도구"],["empirical","The theory lacked empirical evidence to support it.","① 실증적인 ② 이론적인 ③ 직관적인 ④ 가상의 ⑤ 일시적인"],["connotation","The word carries a negative connotation in this context.","① 함축된 의미 ② 사전적 의미 ③ 반대말 ④ 동의어 ⑤ 발음"],["dichotomy","The article presents a false dichotomy between the two options.","① 이분법 ② 통합 ③ 연속체 ④ 합의 ⑤ 모순"],["tenuous","The link between the two events is tenuous at best.","① 근거가 희박한 ② 명백한 ③ 강력한 ④ 반복적인 ⑤ 공식적인"],["unprecedented","The company faced unprecedented growth last year.","① 전례 없는 ② 예상된 ③ 점진적인 ④ 일시적인 ⑤ 제한된"],["discordant","Critics called the policy discordant with public values.","① 부조화하는 ② 일치하는 ③ 중립적인 ④ 일관된 ⑤ 무관한"]]};
 
 // ===== 문장해석력축 (영어, 레벨당 1문항, 3문장 지문, 지문내 어휘재활용 오답) =====
 const SYNTAX_BANK = {"1":{"text":"Nora waters her plants every Sunday morning.","choices":["노라는 일요일 아침마다 화분에 물을 준다","노라는 일요일 저녁마다 화분에 물을 준다","노라는 토요일 아침마다 화분에 물을 준다","노라는 일요일 아침마다 화분을 정리한다","노라는 일요일 아침마다 화분을 옮겨놓는다"],"answer":0},"2":{"text":"After Mia finished her homework, she called her friend and they talked for an hour.","choices":["미아는 숙제를 끝낸 후 친구에게 전화해서 한 시간 동안 이야기했다","미아는 친구와 통화한 후 숙제를 시작해서 한 시간 동안 몰두했다","미아의 친구는 숙제를 끝낸 후 미아에게 전화해서 한 시간 이야기했다","미아는 숙제를 끝낸 후 친구를 만나서 한 시간 동안 함께 놀았다","미아는 숙제를 끝내는 동안 친구와 통화하며 한 시간을 보냈다"],"answer":0},"3":{"text":"The book that Jina borrowed from the library was written by her favorite author.","choices":["지나가 도서관에서 빌린 책은 그녀가 가장 좋아하는 작가가 쓴 책이다","지나가 가장 좋아하는 작가에게서 직접 빌린 책은 도서관 소장품이다","도서관 사서가 지나에게 추천한 책은 그녀가 좋아하는 작가의 책이다","지나가 직접 쓴 책은 그녀가 가장 좋아하는 작가가 도서관에 빌렸다","지나가 도서관에 반납한 책은 그녀가 좋아하는 작가가 쓴 책이다"],"answer":0},"4":{"text":"Having finished the report early, Daniel decided to help his coworker with the presentation.","choices":["보고서를 일찍 끝낸 다니엘은 동료의 발표 준비를 돕기로 결정했다","발표 준비를 일찍 끝낸 다니엘은 동료의 보고서 작성을 돕기로 했다","다니엘의 동료는 보고서를 일찍 끝내고 다니엘의 발표를 도왔다","보고서를 늦게 끝낸 다니엘은 동료의 발표 준비를 돕지 못했다","다니엘은 보고서를 끝낸 후 동료 대신 발표를 하기로 결정했다"],"answer":0},"5":{"text":"The more carefully Eric reviewed the contract, the more mistakes he discovered that the previous team had overlooked.","choices":["에릭이 계약서를 더 꼼꼼히 검토할수록 이전 팀이 놓친 실수를 더 발견했다","에릭이 계약서를 대충 검토할수록 이전 팀이 놓친 실수를 더 발견했다","이전 팀이 계약서를 더 꼼꼼히 검토할수록 에릭의 실수를 더 발견했다","에릭이 계약서를 꼼꼼히 검토할수록 자신의 실수를 더 많이 발견했다","에릭이 계약서를 검토하는 동안 이전 팀이 실수를 바로잡기 시작했다"],"answer":0},"6":{"text":"By the time the report had been reviewed by three separate editors, most of the original arguments had already been rewritten.","choices":["세 명의 편집자가 각각 검토했을 때쯤 원래 주장 대부분은 이미 다시 쓰였다","세 명의 편집자가 검토하기 전에 원래 주장 대부분은 이미 다시 쓰였다","한 명의 편집자가 검토했을 때쯤 원래 주장 대부분은 이미 다시 쓰였다","세 명의 편집자가 검토했을 때쯤 원래 주장은 거의 수정되지 않았다","세 명의 편집자가 동시에 검토하자 원래 주장이 곧바로 정리되었다"],"answer":0},"7":{"text":"Rarely had the committee faced such fierce opposition, and had they anticipated it, they might have delayed the announcement.","choices":["위원회는 그런 거센 반대를 겪은 적이 없었고 예상했다면 발표를 미뤘을 것이다","위원회는 그런 거센 반대를 자주 겪었고 이번에도 예정대로 발표를 진행했다","위원회는 반대를 예상하지 못했지만 결국 발표를 예정대로 진행하였다","위원회는 거센 반대를 예상했기에 실제로 발표를 연기하기로 결정했다","위원회는 거센 반대에 직면했지만 이를 미리 예상하고 대비해두었다"],"answer":0},"8":{"text":"The researchers, who had spent a decade studying the region, concluded that the changes—which most scientists had dismissed as temporary—were in fact permanent.","choices":["10년간 그 지역을 연구한 연구자들은 일시적이라 여겨진 변화가 영구적이라 결론지었다","10년간 그 지역을 연구한 연구자들은 영구적이라 여겨진 변화가 일시적이라 결론지었다","일부 연구자만 그 지역을 10년간 연구해 변화가 영구적이라고 주장했다","대부분의 과학자들은 그 지역의 변화가 영구적이라는 데 이미 동의하고 있었다","10년간 그 지역을 연구했지만 연구자들은 변화의 원인을 밝히지 못했다"],"answer":0},"9":{"text":"What the data suggest—contrary to what many had assumed—is not that consumer behavior changed abruptly, but that the shift had been occurring gradually long before anyone noticed it.","choices":["데이터는 예상과 달리 소비자 행동이 갑자기가 아니라 서서히 변해왔음을 보여준다","데이터는 예상대로 소비자 행동이 갑작스럽게 변했다는 것을 확인해주었다","데이터는 소비자 행동이 급격히 변했으나 그 원인은 밝히지 못했음을 보여준다","많은 사람들은 서서히 변했다고 예상했고 데이터도 이를 뒷받침해주었다","데이터는 소비자 행동에 어떤 변화도 없었다는 사실을 분명히 보여준다"],"answer":0}};
@@ -1828,7 +1755,7 @@ function render() {
         wrap.appendChild(btn);
       });
       appendDontKnowButton(wrap, () => answerSingleFirst(false, true));
-      if (axis.key === 'syntax') appendTranslateButton(document.querySelector('.card'), q.text, q.choices);
+      if (axis.key === 'syntax') { appendTranslateButton(document.querySelector('.card'), q.text, q.choices); appendWordLookupButton(document.querySelector('.card'), q.text, () => render()); }
       document.getElementById('saveExitBtn').onclick = saveAndExitDiagnostic;
     } else {
       // confirm 모드: 같은 레벨 확인문항 3개 (실제 콘텐츠)
@@ -1855,7 +1782,7 @@ function render() {
         wrap.appendChild(btn);
       });
       appendDontKnowButton(wrap, () => selectConfirm(false, true));
-      if (axis.key === 'syntax') appendTranslateButton(document.querySelector('.card'), cq.text, cq.choices);
+      if (axis.key === 'syntax') { appendTranslateButton(document.querySelector('.card'), cq.text, cq.choices); appendWordLookupButton(document.querySelector('.card'), cq.text, () => render()); }
       document.getElementById('saveExitBtn').onclick = saveAndExitDiagnostic;
     }
   } else {
@@ -2201,6 +2128,7 @@ function renderTypePractice() {
       <div id="choices"></div>
     </div>`;
   appendTranslateButton(document.querySelector('.card'), item.text, item.choices);
+  appendWordLookupButton(document.querySelector('.card'), item.text, () => renderTypePractice());
   const wrap = document.getElementById('choices');
   item.choices.forEach((c, i) => {
     const btn = document.createElement('button');
@@ -2425,6 +2353,7 @@ function renderTrainingItem() {
     </div>`;
   document.getElementById('speakPassageBtn').onclick = () => speakText(item.text);
   appendTranslateButton(document.querySelector('.card'), item.text, shuffledChoices);
+  appendWordLookupButton(document.querySelector('.card'), item.text, () => renderTrainingItem());
   const wrap = document.getElementById('choices');
   shuffledChoices.forEach((c,i)=>{
     const btn=document.createElement('button');
@@ -2646,8 +2575,20 @@ async function lookupWordDefinition(word) {
   }
 }
 
-function renderWordLookupScreen(passageText) {
+// 지문 속 영어 단어를 클릭해서 바로 뜻을 찾아볼 수 있게 해주는 버튼.
+// 어휘력축(3축진단)에는 절대 넣지 않는다 — 그 축은 "단어를 아는지 자체"를 재는 시험이라,
+// 뜻을 미리 보여주면 진단 자체가 무의미해지기 때문. 그 외의 화면(연습·훈련성 화면)에는 자유롭게 사용 가능.
+function appendWordLookupButton(container, passageText, onDone) {
+  const btn = document.createElement('button');
+  btn.style.cssText = 'background:#EEF2FF;color:#1E3A5F;border:1px solid #C7D2FE;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;margin:6px 6px 6px 0;';
+  btn.textContent = '📖 단어 뜻 보기';
+  btn.onclick = () => renderWordLookupScreen(passageText, onDone);
+  container.appendChild(btn);
+}
+
+function renderWordLookupScreen(passageText, onDone) {
   const app = document.getElementById('app');
+  const returnFn = onDone || renderTrainingItem; // 기존 호출부(유형훈련 오답 후)와의 호환을 위해 기본값 유지
   // 지문을 "단어"와 "그 사이의 공백/기호"로 나눠서, 단어 부분만 클릭 가능한 버튼으로 만든다.
   const tokens = passageText.split(/(\s+)/);
   const wordSpansHtml = tokens.map((tok, i) => {
@@ -2659,10 +2600,10 @@ function renderWordLookupScreen(passageText) {
 
   app.innerHTML = `<div class="card">
     <p style="font-size:13px;font-weight:600;color:#1E3A5F;margin:0 0 6px;">📖 모르는 단어를 눌러보세요</p>
-    <p style="font-size:11.5px;color:#9CA3AF;margin:0 0 10px;">영어 단어를 탭하면 바로 뜻이 나옵니다. 다 확인했으면 아래 버튼으로 다음 문제로 넘어가세요.</p>
+    <p style="font-size:11.5px;color:#9CA3AF;margin:0 0 10px;">영어 단어를 탭하면 바로 뜻이 나옵니다. 다 확인했으면 아래 버튼으로 돌아가세요.</p>
     <div style="font-size:14.5px;line-height:2;padding:12px;background:#F9FAFB;border-radius:10px;">${wordSpansHtml}</div>
     <div id="wordDefBox" style="margin-top:10px;"></div>
-    <button class="primary" id="doneWordLookupBtn" style="margin-top:14px;">학습 완료, 다음 문제로 →</button>
+    <button class="primary" id="doneWordLookupBtn" style="margin-top:14px;">← 돌아가기</button>
   </div>`;
 
   const defBox = document.getElementById('wordDefBox');
@@ -2685,7 +2626,7 @@ function renderWordLookupScreen(passageText) {
     };
   });
 
-  document.getElementById('doneWordLookupBtn').onclick = () => renderTrainingItem();
+  document.getElementById('doneWordLookupBtn').onclick = returnFn;
 }
 
 async function recordDifficultyFeedback(reasonKey) {
@@ -2843,6 +2784,7 @@ function renderTypeTest() {
       <div id="choices"></div>
     </div>`;
   appendTranslateButton(document.querySelector('.card'), item.text, shuffledChoices);
+  appendWordLookupButton(document.querySelector('.card'), item.text, () => renderTypeTest());
   const wrap = document.getElementById('choices');
   shuffledChoices.forEach((c,i)=>{
     const btn=document.createElement('button');
