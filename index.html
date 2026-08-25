@@ -858,6 +858,7 @@ async function renderIntro() {
 async function renderWelcomeBack(remembered) {
   const app = document.getElementById('app');
   let teacherComment = '';
+  let isNewFromServer = null; // null=서버 응답 없음(폴백모드), true/false=서버가 판단한 새 코멘트 여부
   if (GOOGLE_SHEET_WEBHOOK_URL) {
     try {
       const cres = await fetch(GOOGLE_SHEET_WEBHOOK_URL, {
@@ -865,14 +866,14 @@ async function renderWelcomeBack(remembered) {
         body: JSON.stringify({ action: 'get_comment', name: remembered.name, school: remembered.school, grade: remembered.grade, number: remembered.number })
       });
       const cdata = await cres.json();
-      if (cdata.status === 'ok') teacherComment = cdata.comment || '';
+      if (cdata.status === 'ok') { teacherComment = cdata.comment || ''; isNewFromServer = !!cdata.isNew; }
     } catch (e) { /* 코멘트 조회 실패 시 조용히 넘어감 - 학생 흐름을 막지 않음 */ }
   }
-  // 이미 한 번 보여준 적 있는 코멘트라면 다시 보여주지 않는다 (매번 뜨는 것을 방지).
-  // 선생님이 코멘트 내용을 바꾸면(=새 코멘트) 그때는 다시 새롭게 보여준다.
-  const seenKey = 'seen-comment:' + remembered.school + ':' + remembered.grade + ':' + remembered.number + ':' + remembered.name;
-  let alreadySeen = false;
-  if (teacherComment) {
+  // 서버(구글시트)가 "이미 확인함" 여부를 판단해주면 그것을 우선 사용한다 (기기를 바꾸거나 시크릿 모드로 봐도 정확함).
+  // 서버 연결이 안 되는 폴백 모드에서는, 이 기기에 기억해둔 값으로 대신 판단한다.
+  let alreadySeen = isNewFromServer === null ? false : !isNewFromServer;
+  if (isNewFromServer === null && teacherComment) {
+    const seenKey = 'seen-comment:' + remembered.school + ':' + remembered.grade + ':' + remembered.number + ':' + remembered.name;
     try {
       const seenRes = await appStorage.get(seenKey, false);
       if (seenRes && seenRes.value === teacherComment) alreadySeen = true;
@@ -1417,7 +1418,7 @@ async function renderStudentDetail(p) {
     try {
       const cres = await fetch(GOOGLE_SHEET_WEBHOOK_URL, {
         method: 'POST', headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'get_comment', name: p.name, school: p.school, grade: p.grade, number: p.number })
+        body: JSON.stringify({ action: 'get_comment', name: p.name, school: p.school, grade: p.grade, number: p.number, markAsRead: false })
       });
       const cdata = await cres.json();
       if (cdata.status === 'ok') existingComment = cdata.comment || '';
