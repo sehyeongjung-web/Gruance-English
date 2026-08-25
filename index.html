@@ -2708,17 +2708,47 @@ function renderWordLookupScreen(passageText, onDone) {
         defBox.innerHTML = `<div style="background:#FEF3C7;border-radius:8px;padding:10px 12px;"><p style="font-size:12.5px;color:#92400E;margin:0;">"${word}"의 뜻을 찾지 못했습니다 (고유명사이거나 사전에 없는 단어일 수 있어요).</p></div>`;
         return;
       }
-      const meaningsHtml = result.meanings.map(m =>
-        `<p style="font-size:12.5px;margin:2px 0;"><span style="color:#7C3AED;font-style:italic;">${m.pos}</span> — ${m.def}</p>`
-      ).join('');
+      // 사전 자체가 영영사전이라, 학생이 바로 이해할 수 있도록 AI로 한국어 뜻을 함께 보여준다.
+      const koreanMeanings = await translateWordMeanings(word, result.meanings);
+      const meaningsHtml = result.meanings.map((m, i) => {
+        const kr = koreanMeanings ? koreanMeanings[i] : null;
+        return `<p style="font-size:12.5px;margin:2px 0;">
+          <span style="color:#7C3AED;font-style:italic;">${m.pos}</span> —
+          ${kr ? `<b>${kr}</b>` : m.def}
+        </p>${kr ? `<p style="font-size:10.5px;color:#9CA3AF;margin:0 0 6px 0;">${m.def}</p>` : ''}`;
+      }).join('');
       defBox.innerHTML = `<div style="background:#EEF2FF;border-radius:8px;padding:10px 12px;">
         <p style="font-size:14px;font-weight:700;color:#1E3A5F;margin:0 0 2px;">${result.word} ${result.phonetic ? `<span style="font-size:11px;color:#9CA3AF;font-weight:400;">${result.phonetic}</span>` : ''}</p>
         ${meaningsHtml}
+        ${koreanMeanings ? '' : '<p style="font-size:10.5px;color:#9CA3AF;margin:4px 0 0;">(한국어 번역 기능이 꺼져있어 영어 정의만 표시됩니다.)</p>'}
       </div>`;
     };
   });
 
   document.getElementById('doneWordLookupBtn').onclick = returnFn;
+}
+
+// 사전에서 가져온 영어 뜻풀이를 한국어로 번역한다 (AI 기능이 꺼져있으면 null을 반환해서, 호출부가 영어를 그대로 보여주게 한다).
+const wordTranslationCache = {};
+async function translateWordMeanings(word, meanings) {
+  if (!GOOGLE_SHEET_WEBHOOK_URL || !meanings || meanings.length === 0) return null;
+  const cacheKey = word + '::' + meanings.map(m => m.def).join('|');
+  if (wordTranslationCache[cacheKey] !== undefined) return wordTranslationCache[cacheKey];
+  try {
+    const res = await fetch(GOOGLE_SHEET_WEBHOOK_URL, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'translate_word', word: word, meanings: meanings })
+    });
+    const data = await res.json();
+    if (data.status !== 'ok' || !data.translation) { wordTranslationCache[cacheKey] = null; return null; }
+    // "1. 뜻풀이\n2. 뜻풀이" 형식을 줄 단위로 분리해서, 각 줄 앞의 번호를 제거한다.
+    const lines = data.translation.split('\n').map(l => l.replace(/^\s*\d+\.\s*/, '').trim()).filter(l => l);
+    wordTranslationCache[cacheKey] = lines.length ? lines : null;
+    return wordTranslationCache[cacheKey];
+  } catch (e) {
+    wordTranslationCache[cacheKey] = null;
+    return null;
+  }
 }
 
 async function recordDifficultyFeedback(reasonKey) {
