@@ -2975,7 +2975,74 @@ async function renderTypeTestSummary(app) {
   }
 }
 
-renderIntro();
+// ============================================
+// 접속 코드 관문 (책 구매자용)
+// 이 앱은 "그루앙스 3000" 책을 구매한 학생에게 제공되는 코드가 있어야 사용할 수 있다.
+// 한 번 인증되면 이 기기에는 "인증됨" 표시를 남겨서, 다음부터는 코드를 다시 묻지 않는다.
+// 선생님 전용 링크(?admin=...)로 들어오는 경우는 코드 없이 그대로 통과시킨다(관리 목적).
+// ============================================
+async function checkAccessGate() {
+  if (isTeacherAccess) { renderIntro(); return; } // 선생님은 코드 없이 통과
+
+  let verified = false;
+  try {
+    const res = await appStorage.get('access-code-verified', false);
+    if (res && res.value === 'true') verified = true;
+  } catch (e) { /* 이 기기에서 아직 인증된 적 없음 */ }
+
+  if (verified) { renderIntro(); return; }
+  renderCodeGate();
+}
+
+function renderCodeGate(errorMsg) {
+  const app = document.getElementById('app');
+  app.innerHTML = `<div class="card">
+    <p style="font-size:15px;font-weight:700;margin:0 0 8px;">🔑 접속 코드를 입력해주세요</p>
+    <p style="font-size:12.5px;color:#6B7280;margin:0 0 14px;">「그루앙스 3000」 교재를 구매하시면 받으신 코드를 입력하시면, 이 학습 프로그램을 이용하실 수 있습니다. 코드는 한 번만 입력하시면 이 기기에서는 다시 물어보지 않습니다.</p>
+    ${errorMsg ? `<p style="font-size:12.5px;color:#B42318;font-weight:600;margin:0 0 10px;">${errorMsg}</p>` : ''}
+    <input type="text" id="accessCodeInput" placeholder="예: GRU-2026-A1B2" style="width:100%;padding:11px 12px;border-radius:10px;border:1px solid #D1D5DB;font-size:15px;text-align:center;letter-spacing:1px;text-transform:uppercase;">
+    <button class="primary" id="verifyCodeBtn" style="margin-top:12px;">확인</button>
+    <p style="font-size:11.5px;color:#9CA3AF;margin-top:14px;">코드를 아직 못 받으셨거나 문제가 있으시면, 구매처(선생님)께 문의해주세요.</p>
+  </div>`;
+  const input = document.getElementById('accessCodeInput');
+  const submit = async () => {
+    const code = input.value.trim();
+    if (!code) return;
+    const btn = document.getElementById('verifyCodeBtn');
+    btn.disabled = true; btn.textContent = '확인 중...';
+    if (!GOOGLE_SHEET_WEBHOOK_URL) {
+      renderCodeGate('코드 확인 기능이 아직 설정되지 않았습니다. 선생님께 문의해주세요.');
+      return;
+    }
+    try {
+      const res = await fetch(GOOGLE_SHEET_WEBHOOK_URL, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'verify_code', code: code })
+      });
+      const data = await res.json();
+      if (data.status !== 'ok' || !data.valid) {
+        renderCodeGate('유효하지 않은 코드입니다. 다시 확인해주세요.');
+        return;
+      }
+      if (data.alreadyUsed) {
+        renderCodeGate('이미 사용된 코드입니다. 이전에 등록하셨다면 같은 기기로 들어오시거나, 문제가 있으면 선생님께 문의해주세요.');
+        return;
+      }
+      await fetch(GOOGLE_SHEET_WEBHOOK_URL, {
+        method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'redeem_code', code: code })
+      });
+      await appStorage.set('access-code-verified', 'true', false).catch(() => {});
+      renderIntro();
+    } catch (e) {
+      renderCodeGate('네트워크 오류로 코드를 확인하지 못했습니다. 다시 시도해주세요.');
+    }
+  };
+  document.getElementById('verifyCodeBtn').onclick = submit;
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+}
+
+checkAccessGate();
 </script>
 </body>
 </html>
