@@ -1273,12 +1273,59 @@ function buildTeacherRows(profiles) {
       </tr>`).join('');
 }
 
+// 학생들의 레벨 분포를 막대그래프로 보여주는 함수. 외부 차트 라이브러리 없이 순수 CSS/HTML로 그린다.
+function buildAxisChart(profiles, axisKey, axisLabel, color) {
+  const counts = Array(9).fill(0);
+  profiles.forEach(p => {
+    const lvl = p[axisKey];
+    if (typeof lvl === 'number' && lvl >= 1 && lvl <= 9) counts[lvl-1]++;
+  });
+  const max = Math.max(1, ...counts);
+  const bars = counts.map((c, i) => {
+    const pct = Math.round((c / max) * 100);
+    return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+      <span style="font-size:10.5px;color:#6B7280;width:36px;flex-shrink:0;">레벨${i+1}</span>
+      <div style="flex:1;background:#F3F4F6;border-radius:4px;overflow:hidden;height:14px;">
+        <div style="width:${pct}%;background:${color};height:100%;border-radius:4px;"></div>
+      </div>
+      <span style="font-size:10.5px;color:#374151;width:20px;text-align:right;flex-shrink:0;">${c}</span>
+    </div>`;
+  }).join('');
+  return `<div style="flex:1;min-width:180px;">
+    <p style="font-size:12px;font-weight:600;color:#374151;margin:0 0 6px;">${axisLabel}</p>
+    ${bars}
+  </div>`;
+}
+
+function buildTeacherCharts(profiles) {
+  const total = profiles.length;
+  const completedN = profiles.filter(p => p.completed).length;
+  const completedPct = total ? Math.round((completedN / total) * 100) : 0;
+  return `<div style="background:#F9FAFB;border-radius:12px;padding:14px;margin-bottom:12px;">
+    <p style="font-size:12px;font-weight:600;color:#374151;margin:0 0 4px;">✅ 진단 완료율</p>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+      <div style="flex:1;background:#F3F4F6;border-radius:4px;overflow:hidden;height:14px;">
+        <div style="width:${completedPct}%;background:#175C3A;height:100%;border-radius:4px;"></div>
+      </div>
+      <span style="font-size:11.5px;color:#374151;flex-shrink:0;">${completedN}/${total}명 (${completedPct}%)</span>
+    </div>
+    <p style="font-size:12px;font-weight:600;color:#374151;margin:0 0 8px;">📊 축별 레벨 분포</p>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;">
+      ${buildAxisChart(profiles, 'reason', '추론축', '#1E5A96')}
+      ${buildAxisChart(profiles, 'vocab', '어휘력축', '#7C3AED')}
+      ${buildAxisChart(profiles, 'syntax', '문장해석력축', '#B45309')}
+    </div>
+  </div>`;
+}
+
 function renderTeacherTable(profiles) {
   const app = document.getElementById('app');
   // 카드 전체(입력창 포함)는 최초 1회만 그린다. 검색 중에는 표 영역(teacherTableArea)만 갱신해서
   // input 요소 자체가 매번 재생성되지 않도록 한다 (한글 자모 조합이 끊기는 문제 방지).
   app.innerHTML = `<div class="card">
       <p id="teacherCountText" style="font-size:14px;font-weight:600;margin:0 0 10px;">전체 학생 현황 (검색결과 ${profiles.length}명 / 전체 ${window._teacherProfiles.length}명)</p>
+      <button class="secondary" id="toggleChartBtn" style="margin-bottom:10px;">📊 레벨 분포 그래프 보기</button>
+      <div id="teacherChartArea" style="display:none;"></div>
       <input type="text" id="teacherSearchInput" placeholder="이름, 학교, 학년, 반/번호로 검색..." style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #D1D5DB;margin-bottom:10px;font-size:14px;">
       <div id="teacherTableArea" style="overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
@@ -1293,6 +1340,18 @@ function renderTeacherTable(profiles) {
   document.getElementById('diffStatBtn').onclick = renderDifficultyStats;
   document.getElementById('backBtn').onclick = renderIntro;
   attachDeleteHandlers();
+  const toggleBtn = document.getElementById('toggleChartBtn');
+  const chartArea = document.getElementById('teacherChartArea');
+  let chartBuilt = false;
+  toggleBtn.onclick = () => {
+    const isHidden = chartArea.style.display === 'none';
+    if (isHidden && !chartBuilt) {
+      chartArea.innerHTML = buildTeacherCharts(window._teacherProfiles);
+      chartBuilt = true;
+    }
+    chartArea.style.display = isHidden ? 'block' : 'none';
+    toggleBtn.textContent = isHidden ? '📊 그래프 숨기기' : '📊 레벨 분포 그래프 보기';
+  };
   const searchInput = document.getElementById('teacherSearchInput');
   searchInput.oninput = () => {
     const q = searchInput.value.trim().toLowerCase();
