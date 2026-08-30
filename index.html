@@ -3068,16 +3068,72 @@ async function checkAccessGate() {
   renderCodeGate();
 }
 
+// 코드 신청 처리 - 완전 자동. 이 함수가 호출되면 앱스크립트가 알아서
+// 미사용 코드를 찾아 이메일로 보내준다. 사람이나 AI가 지켜볼 필요가 없다.
+async function submitCodeRequest() {
+  const name = document.getElementById('reqNameInput').value.trim();
+  const email = document.getElementById('reqEmailInput').value.trim();
+  const msgArea = document.getElementById('requestResultMsg');
+  const btn = document.getElementById('sendRequestBtn');
+  if (!email) {
+    msgArea.innerHTML = `<p style="font-size:12px;color:#B42318;margin:0;">이메일 주소를 입력해주세요.</p>`;
+    return;
+  }
+  btn.disabled = true; btn.textContent = '신청 중...';
+  msgArea.innerHTML = '';
+  if (!GOOGLE_SHEET_WEBHOOK_URL) {
+    msgArea.innerHTML = `<p style="font-size:12px;color:#B42318;margin:0;">이 기능이 아직 설정되지 않았습니다. 선생님께 문의해주세요.</p>`;
+    btn.disabled = false; btn.textContent = '코드 받기';
+    return;
+  }
+  try {
+    const res = await fetch(GOOGLE_SHEET_WEBHOOK_URL, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'request_code', name: name, email: email })
+    });
+    const data = await res.json();
+    if (data.status === 'ok') {
+      msgArea.innerHTML = `<p style="font-size:12.5px;color:#166534;font-weight:600;margin:0;">✅ ${email}로 코드를 보내드렸습니다! 메일함(스팸함도 확인)을 확인해주세요.</p>`;
+      btn.style.display = 'none';
+    } else {
+      msgArea.innerHTML = `<p style="font-size:12px;color:#B42318;margin:0;">${data.message || '신청에 실패했습니다. 잠시 후 다시 시도해주세요.'}</p>`;
+      btn.disabled = false; btn.textContent = '코드 받기';
+    }
+  } catch (e) {
+    msgArea.innerHTML = `<p style="font-size:12px;color:#B42318;margin:0;">네트워크 오류가 발생했습니다. 다시 시도해주세요.</p>`;
+    btn.disabled = false; btn.textContent = '코드 받기';
+  }
+}
+
 function renderCodeGate(errorMsg) {
   const app = document.getElementById('app');
   app.innerHTML = `<div class="card">
     <p style="font-size:15px;font-weight:700;margin:0 0 8px;">🔑 접속 코드를 입력해주세요</p>
-    <p style="font-size:12.5px;color:#6B7280;margin:0 0 14px;">「그루앙스 3000」 교재를 구매하시면 받으신 코드를 입력하시면, 이 학습 프로그램을 이용하실 수 있습니다. 코드는 한 번만 입력하시면 이 기기에서는 다시 물어보지 않습니다.</p>
+    <p style="font-size:12.5px;color:#6B7280;margin:0 0 14px;">그루앙스 AI 수능영어코치를 이용하시려면 등록 코드가 필요합니다. 코드가 없으시면 아래 "코드 신청하기"를 눌러 발급받으실 수 있습니다. 코드는 한 번만 입력하시면 이 기기에서는 다시 물어보지 않습니다.</p>
     ${errorMsg ? `<p style="font-size:12.5px;color:#B42318;font-weight:600;margin:0 0 10px;">${errorMsg}</p>` : ''}
     <input type="text" id="accessCodeInput" placeholder="예: GRU-2026-A1B2" style="width:100%;padding:11px 12px;border-radius:10px;border:1px solid #D1D5DB;font-size:15px;text-align:center;letter-spacing:1px;text-transform:uppercase;">
     <button class="primary" id="verifyCodeBtn" style="margin-top:12px;">확인</button>
-    <p style="font-size:11.5px;color:#9CA3AF;margin-top:14px;">코드를 아직 못 받으셨거나 문제가 있으시면, 구매처(선생님)께 문의해주세요.</p>
+    <button class="secondary" id="requestCodeToggleBtn" style="margin-top:10px;">📧 코드가 없어요 — 이메일로 받기</button>
+    <div id="requestCodeArea" style="display:none;margin-top:10px;"></div>
+    <p style="font-size:11.5px;color:#9CA3AF;margin-top:14px;">문제가 계속되면 선생님께 문의해주세요.</p>
   </div>`;
+  const reqToggleBtn = document.getElementById('requestCodeToggleBtn');
+  const reqArea = document.getElementById('requestCodeArea');
+  reqToggleBtn.onclick = () => {
+    if (reqArea.style.display === 'none') {
+      reqArea.style.display = 'block';
+      reqArea.innerHTML = `
+        <div style="background:#EEF2FF;border:1px solid #C7D2FE;border-radius:10px;padding:12px;text-align:left;">
+          <p style="font-size:12px;font-weight:600;color:#3730A3;margin:0 0 8px;">이름과 이메일을 입력하시면, 등록 코드를 이메일로 바로 보내드립니다.</p>
+          <input type="text" id="reqNameInput" placeholder="이름" style="width:100%;padding:9px 10px;border-radius:8px;border:1px solid #D1D5DB;font-size:13px;margin-bottom:6px;">
+          <input type="email" id="reqEmailInput" placeholder="이메일 주소" style="width:100%;padding:9px 10px;border-radius:8px;border:1px solid #D1D5DB;font-size:13px;">
+          <button class="primary" id="sendRequestBtn" style="margin-top:8px;width:100%;">코드 받기</button>
+          <div id="requestResultMsg" style="margin-top:8px;"></div>
+        </div>`;
+      document.getElementById('sendRequestBtn').onclick = submitCodeRequest;
+      reqToggleBtn.style.display = 'none';
+    }
+  };
   const input = document.getElementById('accessCodeInput');
   const submit = async () => {
     const code = input.value.trim();
