@@ -2186,6 +2186,13 @@ const TEACHER_PASSWORD = "3113";
 const TEACHER_ACCESS_TOKEN = "grouance-teacher-key";
 const isTeacherAccess = new URLSearchParams(window.location.search).get('admin') === TEACHER_ACCESS_TOKEN;
 
+// ▼▼▼ 유지보수 모드 스위치 ▼▼▼
+// true로 두면 학생은 접속 시 "정교하게 수정 중" 안내만 보고 앱을 이용할 수 없습니다.
+// 선생님 모드(?admin=...)는 이 스위치와 무관하게 항상 정상 접속됩니다.
+// 보강 작업이 끝나면 이 값을 false로 바꾸고 재배포하면 학생 접속이 다시 열립니다.
+const MAINTENANCE_MODE = true;
+// ▲▲▲ 유지보수 모드 스위치 ▲▲▲
+
 async function logToGoogleSheet(profile) {
   if (!GOOGLE_SHEET_WEBHOOK_URL) return; // URL 미설정 시 조용히 건너뜀
   try {
@@ -3055,8 +3062,19 @@ async function renderTypeTestSummary(app) {
 // 한 번 인증되면 이 기기에는 "인증됨" 표시를 남겨서, 다음부터는 코드를 다시 묻지 않는다.
 // 선생님 전용 링크(?admin=...)로 들어오는 경우는 코드 없이 그대로 통과시킨다(관리 목적).
 // ============================================
+function renderMaintenanceScreen() {
+  const app = document.getElementById('app');
+  app.innerHTML = `<div class="card" style="text-align:center;">
+    <p style="font-size:34px;margin:0 0 10px;">🛠️</p>
+    <p style="font-size:16px;font-weight:700;margin:0 0 10px;">현재 문제를 더 정교하게 다듬고 있어요</p>
+    <p style="font-size:13px;color:#6B7280;line-height:1.6;margin:0 0 4px;">더 좋은 문제로 업데이트하는 중입니다.<br>잠시 후 다시 접속해주세요.</p>
+    <p style="font-size:11.5px;color:#9CA3AF;margin-top:16px;">문의사항은 선생님께 연락해주세요.</p>
+  </div>`;
+}
+
 async function checkAccessGate() {
-  if (isTeacherAccess) { renderIntro(); return; } // 선생님은 코드 없이 통과
+  if (isTeacherAccess) { renderIntro(); return; } // 선생님은 유지보수 모드와 무관하게 항상 통과
+  if (MAINTENANCE_MODE) { renderMaintenanceScreen(); return; } // 학생 접속 차단
 
   let verified = false;
   try {
