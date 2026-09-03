@@ -2190,7 +2190,7 @@ const isTeacherAccess = new URLSearchParams(window.location.search).get('admin')
 // true로 두면 학생은 접속 시 "정교하게 수정 중" 안내만 보고 앱을 이용할 수 없습니다.
 // 선생님 모드(?admin=...)는 이 스위치와 무관하게 항상 정상 접속됩니다.
 // 보강 작업이 끝나면 이 값을 false로 바꾸고 재배포하면 학생 접속이 다시 열립니다.
-const MAINTENANCE_MODE = true;
+const MAINTENANCE_MODE = false;
 // ▲▲▲ 유지보수 모드 스위치 ▲▲▲
 
 async function logToGoogleSheet(profile) {
