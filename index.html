@@ -2158,8 +2158,10 @@ async function renderFinal(app) {
   document.getElementById('restartBtn').onclick = renderIntro;
   document.getElementById('trainBtn').onclick = () => startTraining(minAxis, Math.min(9, (r[minAxis]||0)+1));
   document.querySelectorAll('.typeRowBtn').forEach(btn => {
-    btn.onclick = () => startTraining(btn.dataset.code, parseInt(btn.dataset.level));
+    btn.onclick = () => startTypePractice(btn.dataset.code, parseInt(btn.dataset.level));
   });
+  const goMenuBtn = document.getElementById('goTypeMenuBtn');
+  if (goMenuBtn) goMenuBtn.onclick = renderTypeMenu;
 
   try {
     await saveProfilePartial();
@@ -2269,6 +2271,7 @@ function renderTypeLevelTable(r) {
     <div class="card" style="margin-top:14px;padding:16px;">
       <p style="font-size:13.5px;font-weight:600;margin:0 0 8px;">문항별 실전 훈련 레벨 (18~45번, 25개 유형 전체)</p>
       <p style="font-size:11px;color:#9CA3AF;margin:0 0 8px;">유형을 눌러 바로 그 레벨 문제를 풀어볼 수 있습니다.</p>
+      <button id="goTypeMenuBtn" class="primary" style="margin:0 0 10px;">유형별 훈련 시작하기 (진행 현황 보기)</button>
       ${rowsHtml}
     </div>`;
 }
@@ -2276,10 +2279,150 @@ function renderTypeLevelTable(r) {
 let typePracticeCode = '';
 let typePracticeLevel = 1;
 
+// ===== 유형별 훈련 진행 상태 =====
+// typeProgress[코드] = { level: 현재레벨, done: 푼문항수, correct: 맞힌수, completed: 완료여부, bestRate: 최고정답률 }
+let typeProgress = {};
+const TYPE_SET_SIZE = 10;      // 한 유형당 한 세트 문항 수
+const LEVELUP_SUGGEST_RATE = 80; // 이 정답률 이상이면 레벨업 권유
+
+function typeProgressKey() {
+  return 'typeprogress:' + studentSchool + ':' + studentGrade + ':' + studentNumber + ':' + studentName;
+}
+
+async function loadTypeProgress() {
+  try {
+    const res = await appStorage.get(typeProgressKey(), true);
+    if (res && res.value) typeProgress = JSON.parse(res.value);
+  } catch (e) { typeProgress = {}; }
+  if (!typeProgress || typeof typeProgress !== 'object') typeProgress = {};
+}
+
+function saveTypeProgress() {
+  try { appStorage.set(typeProgressKey(), JSON.stringify(typeProgress), true); } catch (e) {}
+}
+
+function getTypeState(code) {
+  if (!typeProgress[code]) typeProgress[code] = { level: null, done: 0, correct: 0, completed: false, bestRate: 0 };
+  return typeProgress[code];
+}
+
+// ===== 상단 진행 표시기 (컨설팅 문서의 목차 네비게이션 방식) =====
+// stage: 'diagnosis' | 'result' | 'training' | 'review'
+function progressHeaderHtml(stage, sub) {
+  const steps = [
+    { key: 'diagnosis', label: '진단' },
+    { key: 'result', label: '결과' },
+    { key: 'training', label: '유형훈련' },
+    { key: 'review', label: '복습' },
+  ];
+  const chips = steps.map((s, i) => {
+    const on = s.key === stage;
+    const chip = `<span style="font-size:10.5px;padding:3px 7px;border-radius:20px;white-space:nowrap;${on ? 'background:#E1F5EE;color:#0F6E56;font-weight:600;' : 'background:#F3F4F6;color:#9CA3AF;'}">${s.label}</span>`;
+    const arrow = i < steps.length - 1 ? `<span style="font-size:10px;color:#D1D5DB;">›</span>` : '';
+    return chip + arrow;
+  }).join('');
+
+  let subHtml = '';
+  if (sub) {
+    const pct = sub.total > 0 ? Math.round((sub.done / sub.total) * 100) : 0;
+    subHtml = `
+      <div style="padding:8px 12px;background:#F9FAFB;border-top:1px solid #F3F4F6;">
+        <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
+          <span style="font-size:11.5px;color:#6B7280;">${sub.title}</span>
+          ${sub.level ? `<span style="font-size:10.5px;padding:2px 6px;border-radius:20px;background:#E6F1FB;color:#0C447C;">레벨 ${sub.level}</span>` : ''}
+          <span style="margin-left:auto;font-size:10.5px;color:#9CA3AF;">${sub.done} / ${sub.total}${sub.unit || '문항'}</span>
+        </div>
+        <div style="margin-top:6px;height:4px;background:#E5E7EB;border-radius:20px;overflow:hidden;">
+          <div style="width:${pct}%;height:100%;background:#1D9E75;"></div>
+        </div>
+      </div>`;
+  }
+
+  return `
+    <div style="border:1px solid #E5E7EB;border-radius:10px;overflow:hidden;margin-bottom:12px;background:#fff;">
+      <div style="display:flex;align-items:center;gap:3px;padding:8px 12px;overflow-x:auto;">
+        ${chips}
+      </div>
+      ${subHtml}
+    </div>`;
+}
+
 function startTypePractice(code, level) {
   typePracticeCode = code;
-  typePracticeLevel = Math.max(1, Math.min(9, level));
+  const st = getTypeState(code);
+  // 저장된 레벨이 있으면 그것을 우선 사용 (레벨업 결과 유지)
+  typePracticeLevel = Math.max(1, Math.min(9, st.level != null ? st.level : level));
+  if (st.level == null) { st.level = typePracticeLevel; saveTypeProgress(); }
+  // 이미 한 세트를 끝낸 유형을 다시 들어오면 새 세트로 초기화
+  if (st.done >= TYPE_SET_SIZE) { st.done = 0; st.correct = 0; saveTypeProgress(); }
   renderTypePractice();
+}
+
+// ===== 유형 선택 화면 (25개 유형 목록) =====
+let typeProgressLoaded = false;
+
+async function renderTypeMenu() {
+  const app = document.getElementById('app');
+  if (!typeProgressLoaded) {
+    app.innerHTML = `<div class="card"><p style="font-size:13px;color:#6B7280;">진행 상황을 불러오는 중...</p></div>`;
+    await loadTypeProgress();
+    typeProgressLoaded = true;
+  }
+  const r = (typeof results !== 'undefined' && results) ? results : {};
+  const reason = r.reason || 0, vocab = r.vocab || 0, syntax = r.syntax || 0;
+
+  const doneCount = TYPE_LEVEL_FORMULAS.filter(f => getTypeState(f.code).completed).length;
+  const totalCount = TYPE_LEVEL_FORMULAS.length;
+
+  const rows = TYPE_LEVEL_FORMULAS.map(f => {
+    const st = getTypeState(f.code);
+    const autoLevel = Math.max(1, Math.min(9, Math.round(f.calc(reason, vocab, syntax))));
+    const lvl = st.level != null ? st.level : autoLevel;
+    const inProgress = st.done > 0 && st.done < TYPE_SET_SIZE;
+
+    let icon, border, right, nameStyle;
+    if (st.completed) {
+      icon = '<span style="color:#1D9E75;font-size:15px;">✓</span>';
+      border = '1px solid #E5E7EB';
+      right = `<span style="font-size:10.5px;color:#9CA3AF;">정답률 ${st.bestRate}% · 레벨 ${lvl}</span>`;
+      nameStyle = 'color:#6B7280;';
+    } else if (inProgress) {
+      icon = '<span style="color:#1D9E75;font-size:13px;">▶</span>';
+      border = '2px solid #1D9E75';
+      right = `<span style="font-size:10.5px;color:#0F6E56;font-weight:600;">${st.done}/${TYPE_SET_SIZE} · 이어하기 →</span>`;
+      nameStyle = 'color:#111827;font-weight:600;';
+    } else {
+      icon = '<span style="color:#D1D5DB;font-size:15px;">○</span>';
+      border = '1px solid #E5E7EB';
+      right = `<span style="font-size:10.5px;color:#9CA3AF;">레벨 ${lvl} →</span>`;
+      nameStyle = 'color:#111827;';
+    }
+
+    return `<button class="typeMenuBtn" data-code="${f.code}" data-level="${lvl}"
+      style="display:flex;align-items:center;gap:9px;width:100%;background:#fff;border:${border};border-radius:8px;padding:9px 11px;margin-bottom:6px;cursor:pointer;text-align:left;">
+      ${icon}
+      <span style="font-size:12.5px;${nameStyle}">${f.code.replace('_','~')}번 ${f.name}</span>
+      <span style="margin-left:auto;">${right}</span>
+    </button>`;
+  }).join('');
+
+  app.innerHTML = progressHeaderHtml('training', {
+    title: '전체 유형 진행',
+    done: doneCount,
+    total: totalCount,
+    unit: '개 유형',
+  }) + `
+    <div class="card">
+      <p style="font-size:14px;font-weight:600;margin:0 0 4px;">유형별 훈련</p>
+      <p style="font-size:11.5px;color:#9CA3AF;margin:0 0 12px;">유형을 눌러 바로 시작하세요. 레벨은 진단 결과에 맞춰 자동 설정됩니다.</p>
+      ${rows}
+      <button class="secondary" id="typeMenuBack" style="margin-top:6px;">처음으로</button>
+    </div>`;
+
+  document.querySelectorAll('.typeMenuBtn').forEach(b => {
+    b.onclick = () => startTypePractice(b.dataset.code, Number(b.dataset.level));
+  });
+  document.getElementById('typeMenuBack').onclick = renderIntro;
 }
 
 function renderTypePractice() {
@@ -2291,7 +2434,13 @@ function renderTypePractice() {
     document.getElementById('backBtn2').onclick = renderIntro;
     return;
   }
-  app.innerHTML = `
+  const stNow = getTypeState(typePracticeCode);
+  app.innerHTML = progressHeaderHtml('training', {
+    title: `${typePracticeCode.replace('_','~')}번 ${meta ? meta.name : ''}`,
+    level: typePracticeLevel,
+    done: stNow.done,
+    total: TYPE_SET_SIZE,
+  }) + `
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
         <span class="badge" style="background:#EDE9FE;color:#6D28D9;">${typePracticeCode.replace('_','~')}번 (${meta ? meta.name : ''})</span>
@@ -2330,23 +2479,92 @@ function selectTypePractice(correct, correctWord, questionText, studentAnswerTex
     document.querySelector('.card').appendChild(askAiBtn);
   }
 
+  // ===== 세트 진행 기록 =====
+  const st = getTypeState(typePracticeCode);
+  st.done = (st.done || 0) + 1;
+  if (correct) st.correct = (st.correct || 0) + 1;
+  st.level = typePracticeLevel;
+
+  const card = document.querySelector('.card');
+  const setFinished = st.done >= TYPE_SET_SIZE;
+  const rate = st.done > 0 ? Math.round((st.correct / st.done) * 100) : 0;
+
+  if (setFinished) {
+    st.completed = true;
+    if (rate > (st.bestRate || 0)) st.bestRate = rate;
+  }
+  saveTypeProgress();
+
+  if (setFinished) {
+    // 세트 완료 요약
+    const sum = document.createElement('div');
+    sum.style.cssText = 'margin-top:12px;padding:12px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;';
+    sum.innerHTML = `<p style="font-size:13.5px;font-weight:600;margin:0 0 4px;color:#166534;">${TYPE_SET_SIZE}문항 완료</p>
+      <p style="font-size:12.5px;color:#166534;margin:0;">정답 ${st.correct} / ${TYPE_SET_SIZE} · 정답률 ${rate}%</p>`;
+    card.appendChild(sum);
+
+    if (rate >= LEVELUP_SUGGEST_RATE && typePracticeLevel < 9) {
+      const rec = document.createElement('div');
+      rec.style.cssText = 'margin-top:8px;padding:10px 12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;font-size:12.5px;color:#1E40AF;';
+      rec.textContent = `정답률이 높아요! 레벨 ${typePracticeLevel + 1}에 도전해 볼까요?`;
+      card.appendChild(rec);
+    }
+  }
+
   const navWrap = document.createElement('div');
   navWrap.style.display = 'flex';
   navWrap.style.gap = '10px';
   navWrap.style.marginTop = '10px';
-  const prevBtn = document.createElement('button');
-  prevBtn.className = 'secondary'; prevBtn.style.margin = '0'; prevBtn.textContent = '← 레벨↓';
-  prevBtn.onclick = () => { typePracticeLevel = Math.max(1, typePracticeLevel - 1); renderTypePractice(); };
-  const nextBtn = document.createElement('button');
-  nextBtn.className = 'secondary'; nextBtn.style.margin = '0'; nextBtn.textContent = '레벨↑ →';
-  nextBtn.onclick = () => { typePracticeLevel = Math.min(9, typePracticeLevel + 1); renderTypePractice(); };
-  navWrap.appendChild(prevBtn); navWrap.appendChild(nextBtn);
-  document.querySelector('.card').appendChild(navWrap);
+
+  if (setFinished) {
+    if (typePracticeLevel < 9) {
+      const upBtn = document.createElement('button');
+      upBtn.className = 'primary'; upBtn.style.margin = '0'; upBtn.textContent = `레벨 ${typePracticeLevel + 1} 도전`;
+      upBtn.onclick = () => {
+        typePracticeLevel = Math.min(9, typePracticeLevel + 1);
+        st.level = typePracticeLevel; st.done = 0; st.correct = 0;
+        saveTypeProgress(); renderTypePractice();
+      };
+      navWrap.appendChild(upBtn);
+    }
+    const againBtn = document.createElement('button');
+    againBtn.className = 'secondary'; againBtn.style.margin = '0'; againBtn.textContent = '같은 레벨 더 풀기';
+    againBtn.onclick = () => { st.done = 0; st.correct = 0; saveTypeProgress(); renderTypePractice(); };
+    navWrap.appendChild(againBtn);
+  } else {
+    const contBtn = document.createElement('button');
+    contBtn.className = 'primary'; contBtn.style.margin = '0'; contBtn.textContent = `다음 문항 (${st.done}/${TYPE_SET_SIZE})`;
+    contBtn.onclick = () => renderTypePractice();
+    navWrap.appendChild(contBtn);
+
+    // 세트 중간에도 언제든 레벨 변경 가능 (수동 도전)
+    const prevBtn = document.createElement('button');
+    prevBtn.className = 'secondary'; prevBtn.style.margin = '0'; prevBtn.textContent = '← 레벨↓';
+    prevBtn.onclick = () => {
+      typePracticeLevel = Math.max(1, typePracticeLevel - 1);
+      st.level = typePracticeLevel; st.done = 0; st.correct = 0;
+      saveTypeProgress(); renderTypePractice();
+    };
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'secondary'; nextBtn.style.margin = '0'; nextBtn.textContent = '레벨↑ →';
+    nextBtn.onclick = () => {
+      typePracticeLevel = Math.min(9, typePracticeLevel + 1);
+      st.level = typePracticeLevel; st.done = 0; st.correct = 0;
+      saveTypeProgress(); renderTypePractice();
+    };
+    navWrap.appendChild(prevBtn); navWrap.appendChild(nextBtn);
+  }
+  card.appendChild(navWrap);
+
+  const menuBtn = document.createElement('button');
+  menuBtn.className = 'secondary'; menuBtn.textContent = '유형 목록으로';
+  menuBtn.onclick = renderTypeMenu;
+  card.appendChild(menuBtn);
 
   const backBtn = document.createElement('button');
   backBtn.className = 'secondary'; backBtn.textContent = '처음으로';
   backBtn.onclick = renderIntro;
-  document.querySelector('.card').appendChild(backBtn);
+  card.appendChild(backBtn);
 }
 
 // ===== 훈련 모드 (진단 이후 병목축 연습) =====
