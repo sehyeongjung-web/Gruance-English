@@ -2649,17 +2649,76 @@ function startPromotionTest() {
 }
 
 // ===== 음성 읽어주기 (브라우저 내장 TTS, 네트워크 불필요) =====
+// ===== 음성 안내 =====
+// 브라우저에 설치된 여러 음성 중 가장 자연스러운(신경망 기반) 음성을 골라 쓴다.
+// 기본값을 그대로 쓰면 구형 로봇 음성이 나오는 기기가 많아, 우선순위 목록으로 직접 고른다.
+let _cachedVoice = { ko: null, en: null, ready: false };
+
+function pickBestVoice(lang) {
+  const voices = window.speechSynthesis.getVoices() || [];
+  if (!voices.length) return null;
+
+  const isKo = lang === 'ko-KR';
+  const pool = voices.filter(v => isKo ? /^ko/i.test(v.lang) : /^en/i.test(v.lang));
+  if (!pool.length) return null;
+
+  // 선호 음성 이름 (자연스러운 순서대로). 기기별로 있는 것만 매칭된다.
+  const preferred = isKo
+    ? ['Google 한국의', 'Google 한국어', 'Yuna', 'Heami', 'Microsoft SunHi', 'Microsoft Heami', 'Sora', 'Nuri']
+    : ['Google US English', 'Samantha', 'Ava', 'Microsoft Aria', 'Microsoft Jenny', 'Microsoft Zira', 'Alex'];
+
+  for (const name of preferred) {
+    const hit = pool.find(v => v.name && v.name.toLowerCase().includes(name.toLowerCase()));
+    if (hit) return hit;
+  }
+  // 선호 목록에 없으면: 원격(클라우드) 음성이 대체로 더 자연스러우므로 우선
+  const remote = pool.find(v => v.localService === false);
+  if (remote) return remote;
+  return pool[0];
+}
+
+function refreshVoices() {
+  _cachedVoice.ko = pickBestVoice('ko-KR');
+  _cachedVoice.en = pickBestVoice('en-US');
+  _cachedVoice.ready = !!(_cachedVoice.ko || _cachedVoice.en);
+}
+
+try {
+  if ('speechSynthesis' in window) {
+    refreshVoices();
+    // 크롬 등은 음성 목록을 비동기로 불러오므로 이벤트로 한 번 더 갱신
+    window.speechSynthesis.onvoiceschanged = refreshVoices;
+  }
+} catch (e) {}
+
 function speakText(text) {
   try {
     if (!('speechSynthesis' in window)) {
-      return; // 미지원 브라우저에서는 조용히 무시 (alert 팝업이 막힐 수 있어 사용 안 함)
+      return; // 미지원 브라우저에서는 조용히 무시
     }
     window.speechSynthesis.cancel(); // 이전에 읽던 것 중단
-    const cleanText = text.replace(/[①②③④⑤]/g, '').replace(/\n/g, '. ');
-    const utter = new SpeechSynthesisUtterance(cleanText);
+    if (!_cachedVoice.ready) refreshVoices();
+
+    const cleanText = String(text)
+      .replace(/[①②③④⑤]/g, '')
+      .replace(/[*_#`]/g, '')        // 마크다운 기호는 읽지 않게 제거
+      .replace(/\s*\n+\s*/g, '. ')   // 줄바꿈은 문장 쉼으로
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+    if (!cleanText) return;
+
     const hasKorean = /[가-힣]/.test(cleanText);
+    const utter = new SpeechSynthesisUtterance(cleanText);
     utter.lang = hasKorean ? 'ko-KR' : 'en-US';
-    utter.rate = 0.95;
+
+    const chosen = hasKorean ? _cachedVoice.ko : _cachedVoice.en;
+    if (chosen) utter.voice = chosen;
+
+    // 톤 설정: 또박또박 읽되 기계적이지 않게, 살짝 느긋하고 부드럽게
+    utter.rate = hasKorean ? 0.98 : 0.92;
+    utter.pitch = 1.05;   // 아주 살짝 높여 딱딱함을 덜어냄
+    utter.volume = 1;
+
     window.speechSynthesis.speak(utter);
   } catch (e) {
     // 실패해도 학습 흐름은 막지 않음
@@ -2673,9 +2732,9 @@ function stopSpeaking() {
 // 문항 데이터로 간단한 해설 텍스트를 구성 (상세 해설은 추후 콘텐츠 확충 예정 — 현재는 보유 정보 기반 기본 해설)
 function buildExplanation(item, correctText) {
   if (item.correctWord) {
-    return `이 문항은 올바른 형태/단어가 필요합니다. 정답 위치의 올바른 표현은 "${item.correctWord}"입니다.`;
+    return `여기서는 형태가 중요한 문제예요. 그 자리에 들어갈 알맞은 표현은 ${item.correctWord} 입니다.`;
   }
-  return `정답은 "${correctText}"입니다.`;
+  return `이 문제의 정답은 ${correctText} 였어요.`;
 }
 
 // 영어 지문을 이해하지 못하는 학생을 위한 "해석 보기" 기능.
@@ -2885,7 +2944,7 @@ function selectTraining(correct, word, correctText, questionText, studentAnswerT
     const speakExplainBtn = document.createElement('button');
     speakExplainBtn.style.cssText = 'background:#EEF2FF;color:#3730A3;border:1px solid #C7D2FE;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;margin:4px 4px 8px 0;';
     speakExplainBtn.textContent = '🔊 정답 설명 듣기';
-    speakExplainBtn.onclick = () => speakText(`정답은 ${correctText} 입니다.`);
+    speakExplainBtn.onclick = () => speakText(`이 문제의 정답은 ${correctText} 였어요. 왜 그런지 한번 다시 살펴볼까요?`);
     document.querySelector('.card').appendChild(speakExplainBtn);
 
     const askAiBtn = document.createElement('button');
