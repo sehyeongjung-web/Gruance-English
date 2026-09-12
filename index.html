@@ -2307,13 +2307,13 @@ function renderTypePractice() {
     const btn = document.createElement('button');
     btn.className = 'choice';
     btn.textContent = `${i+1}. ${c}`;
-    btn.onclick = () => selectTypePractice(i === item.answer, item.correctWord);
+    btn.onclick = () => selectTypePractice(i === item.answer, item.correctWord, item.text, c, item.choices[item.answer]);
     wrap.appendChild(btn);
   });
-  appendDontKnowButton(wrap, () => selectTypePractice(false, item.correctWord));
+  appendDontKnowButton(wrap, () => selectTypePractice(false, item.correctWord, item.text, '(모름 - 안 풀었어요)', item.choices[item.answer]));
 }
 
-function selectTypePractice(correct, correctWord) {
+function selectTypePractice(correct, correctWord, questionText, studentAnswerText, correctAnswerText) {
   const buttons = document.querySelectorAll('#choices .choice');
   buttons.forEach(b => b.disabled = true);
   const fb = document.createElement('div');
@@ -2321,6 +2321,14 @@ function selectTypePractice(correct, correctWord) {
   fb.textContent = correct ? '정답입니다.' : `오답입니다.${correctWord ? ` 올바른 형태/단어: ${correctWord}` : ''}`;
   disablePendingSaveExitBtn();
   document.querySelector('.card').appendChild(fb);
+
+  if (!correct && questionText) {
+    const askAiBtn = document.createElement('button');
+    askAiBtn.style.cssText = 'background:#F0FDF4;color:#166534;border:1px solid #BBF7D0;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;margin:4px 0 8px;';
+    askAiBtn.textContent = '🤖 AI에게 질문하기';
+    askAiBtn.onclick = () => openAiChatPanel(questionText, studentAnswerText, correctAnswerText, typePracticeCode);
+    document.querySelector('.card').appendChild(askAiBtn);
+  }
 
   const navWrap = document.createElement('div');
   navWrap.style.display = 'flex';
@@ -2559,7 +2567,7 @@ function axisIdxBadge(key) {
 // 이 파일은 항상 버튼을 보여주되, 서버가 "꺼짐" 상태를 응답하면 안내 메시지만 표시합니다.
 let aiChatHistory = []; // [{role:'user'|'assistant', text:'...'}]
 
-function openAiChatPanel(questionText, studentAnswerText, correctText) {
+function openAiChatPanel(questionText, studentAnswerText, correctText, typeCode) {
   const existing = document.getElementById('aiChatPanel');
   if (existing) { existing.remove(); }
   aiChatHistory = [];
@@ -2580,14 +2588,14 @@ function openAiChatPanel(questionText, studentAnswerText, correctText) {
   const input = document.getElementById('aiChatInput');
   const doSend = () => {
     const userText = input.value.trim();
-    sendAiChatMessage(questionText, studentAnswerText, correctText, userText);
+    sendAiChatMessage(questionText, studentAnswerText, correctText, userText, typeCode);
     input.value = '';
   };
   sendBtn.onclick = doSend;
   input.onkeydown = (e) => { if (e.key === 'Enter') doSend(); };
 
   // 패널을 열자마자 "왜 이게 정답인지 설명해줘"를 자동으로 1회 요청
-  sendAiChatMessage(questionText, studentAnswerText, correctText, '');
+  sendAiChatMessage(questionText, studentAnswerText, correctText, '', typeCode);
 }
 
 function renderAiChatMessages() {
@@ -2599,7 +2607,7 @@ function renderAiChatMessages() {
   wrap.scrollTop = wrap.scrollHeight;
 }
 
-async function sendAiChatMessage(questionText, studentAnswerText, correctText, userQuestion) {
+async function sendAiChatMessage(questionText, studentAnswerText, correctText, userQuestion, typeCode) {
   if (userQuestion) {
     aiChatHistory.push({role:'user', text: userQuestion});
     renderAiChatMessages();
@@ -2621,7 +2629,8 @@ async function sendAiChatMessage(questionText, studentAnswerText, correctText, u
         question: questionText || '',
         studentAnswer: studentAnswerText || '',
         correctAnswer: correctText || '',
-        userQuestion: userQuestion || ''
+        userQuestion: userQuestion || '',
+        axisOrType: typeCode || ''
       })
     });
     const data = await res.json();
@@ -2664,7 +2673,7 @@ function selectTraining(correct, word, correctText, questionText, studentAnswerT
     const askAiBtn = document.createElement('button');
     askAiBtn.style.cssText = 'background:#F0FDF4;color:#166534;border:1px solid #BBF7D0;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;margin:4px 0 8px;';
     askAiBtn.textContent = '🤖 AI에게 질문하기';
-    askAiBtn.onclick = () => openAiChatPanel(questionText, studentAnswerText, correctText);
+    askAiBtn.onclick = () => openAiChatPanel(questionText, studentAnswerText, correctText, trainAxisKey);
     document.querySelector('.card').appendChild(askAiBtn);
   }
 
