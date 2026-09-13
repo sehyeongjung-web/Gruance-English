@@ -2983,7 +2983,7 @@ function selectTraining(correct, word, correctText, questionText, studentAnswerT
     document.querySelector('.card').appendChild(askWrap);
     const skipBtn = document.createElement('button');
     skipBtn.className = 'secondary'; skipBtn.style.marginTop = '6px';
-    skipBtn.textContent = '건너뛰고 다음 문항';
+    skipBtn.textContent = '다음 문항';
     skipBtn.onclick = () => { renderTrainingItem(); };
     document.querySelector('.card').appendChild(skipBtn);
   }
