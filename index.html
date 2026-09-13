@@ -2158,7 +2158,13 @@ async function renderFinal(app) {
   document.getElementById('restartBtn').onclick = renderIntro;
   document.getElementById('trainBtn').onclick = () => startTraining(minAxis, Math.min(9, (r[minAxis]||0)+1));
   document.querySelectorAll('.typeRowBtn').forEach(btn => {
-    btn.onclick = () => startTypePractice(btn.dataset.code, parseInt(btn.dataset.level));
+    btn.onclick = async () => {
+      if (!typeProgressLoaded) { await loadTypeProgress(); typeProgressLoaded = true; }
+      const stB = getTypeState(btn.dataset.code);
+      const lv = stB.level != null ? stB.level : parseInt(btn.dataset.level);
+      if (stB.done >= TYPE_SET_SIZE) { stB.done = 0; stB.correct = 0; saveTypeProgress(); }
+      startTraining(btn.dataset.code, lv);
+    };
   });
   const goMenuBtn = document.getElementById('goTypeMenuBtn');
   if (goMenuBtn) goMenuBtn.onclick = renderTypeMenu;
@@ -2420,7 +2426,14 @@ async function renderTypeMenu() {
     </div>`;
 
   document.querySelectorAll('.typeMenuBtn').forEach(b => {
-    b.onclick = () => startTypePractice(b.dataset.code, Number(b.dataset.level));
+    b.onclick = () => {
+      const stM = getTypeState(b.dataset.code);
+      const lv = stM.level != null ? stM.level : Number(b.dataset.level);
+      stM.level = lv;
+      if (stM.done >= TYPE_SET_SIZE) { stM.done = 0; stM.correct = 0; }
+      saveTypeProgress();
+      startTraining(b.dataset.code, lv);
+    };
   });
   document.getElementById('typeMenuBack').onclick = renderIntro;
 }
@@ -2800,7 +2813,23 @@ function renderTrainingItem() {
   const shuffledChoices = idx.map(i => item.choices[i]);
   const shuffledAnswer = idx.indexOf(item.answer);
 
-  app.innerHTML = `
+  // 진행 표시기: 3축 훈련이면 '진단' 단계, 유형(숫자 코드) 훈련이면 '유형훈련' 단계로 표시
+  const isAxisTrain = ['reason','vocab','syntax'].includes(trainAxisKey);
+  const trStage = isAxisTrain ? 'diagnosis' : 'training';
+  let trSub;
+  if (trainMode === 'test') {
+    trSub = { title: `${typeDisplayName(trainAxisKey)} 승급테스트`, level: trainLevel, done: trainIdx, total: trainPool.length };
+  } else {
+    const stT = isAxisTrain ? null : getTypeState(trainAxisKey);
+    trSub = {
+      title: `${typeDisplayName(trainAxisKey)} 연습`,
+      level: trainLevel,
+      done: stT ? Math.min(stT.done, TYPE_SET_SIZE) : trainIdx,
+      total: stT ? TYPE_SET_SIZE : Math.max(trainPool.length, 1),
+    };
+  }
+
+  app.innerHTML = progressHeaderHtml(trStage, trSub) + `
     <div class="card">
       <span class="badge ${typeBadgeClass(trainAxisKey)}" style="${typeBadgeClass(trainAxisKey) ? '' : 'background:#EDE9FE;color:#6D28D9;'}">${typeDisplayName(trainAxisKey)} ${trainMode === 'practice' ? '연습' : '승급테스트'}</span>
       <span style="font-size:12.5px;color:#6B7280;">레벨 ${trainLevel} · ${trainMode === 'practice' ? `연습 ${trainIdx+1}번째` : `테스트 ${trainIdx+1}/${trainPool.length}`}</span>
@@ -2826,6 +2855,14 @@ function renderTrainingItem() {
     testBtn.textContent = '충분히 연습했어요 → 승급테스트 보러가기';
     testBtn.onclick = startPromotionTest;
     document.querySelector('.card').appendChild(testBtn);
+  }
+  if (!isAxisTrain) {
+    const toMenuBtn = document.createElement('button');
+    toMenuBtn.className = 'secondary';
+    toMenuBtn.style.marginTop = '6px';
+    toMenuBtn.textContent = '📋 유형 목록으로';
+    toMenuBtn.onclick = renderTypeMenu;
+    document.querySelector('.card').appendChild(toMenuBtn);
   }
   const exitBtn = document.createElement('button');
   exitBtn.className = 'secondary';
@@ -2928,6 +2965,23 @@ function selectTraining(correct, word, correctText, questionText, studentAnswerT
   if (correct) trainCorrect++;
   else logWrongAnswer(trainAxisKey, trainLevel, questionText, studentAnswerText, correctText, trainMode === 'test' ? '승급테스트' : '연습');
   logActivity(trainAxisKey, trainLevel, correct);
+
+  // 유형(숫자 코드) 연습이면 세트 진행상태를 기록한다 (3축 훈련은 제외)
+  const isTypeTrain = !['reason','vocab','syntax'].includes(trainAxisKey) && trainMode === 'practice';
+  let typeSetFinished = false, typeSetRate = 0, typeSt = null;
+  if (isTypeTrain) {
+    typeSt = getTypeState(trainAxisKey);
+    typeSt.done = (typeSt.done || 0) + 1;
+    if (correct) typeSt.correct = (typeSt.correct || 0) + 1;
+    typeSt.level = trainLevel;
+    typeSetRate = Math.round((typeSt.correct / typeSt.done) * 100);
+    if (typeSt.done >= TYPE_SET_SIZE) {
+      typeSetFinished = true;
+      typeSt.completed = true;
+      if (typeSetRate > (typeSt.bestRate || 0)) typeSt.bestRate = typeSetRate;
+    }
+    saveTypeProgress();
+  }
   const buttons = document.querySelectorAll('#choices .choice');
   buttons.forEach(b=>b.disabled=true);
   const fb=document.createElement('div');
@@ -2952,6 +3006,43 @@ function selectTraining(correct, word, correctText, questionText, studentAnswerT
     askAiBtn.textContent = '🤖 AI에게 질문하기';
     askAiBtn.onclick = () => openAiChatPanel(questionText, studentAnswerText, correctText, trainAxisKey);
     document.querySelector('.card').appendChild(askAiBtn);
+  }
+
+  // 유형 연습 세트(10문항) 완료 시: 요약 + 레벨업 안내
+  if (typeSetFinished) {
+    const cardEl = document.querySelector('.card');
+    const sum = document.createElement('div');
+    sum.style.cssText = 'margin-top:12px;padding:12px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;';
+    sum.innerHTML = `<p style="font-size:13.5px;font-weight:600;margin:0 0 4px;color:#166534;">${TYPE_SET_SIZE}문항 완료</p>
+      <p style="font-size:12.5px;color:#166534;margin:0;">정답 ${typeSt.correct} / ${TYPE_SET_SIZE} · 정답률 ${typeSetRate}%</p>`;
+    cardEl.appendChild(sum);
+
+    if (typeSetRate >= LEVELUP_SUGGEST_RATE && trainLevel < 9) {
+      const rec = document.createElement('div');
+      rec.style.cssText = 'margin-top:8px;padding:10px 12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;font-size:12.5px;color:#1E40AF;';
+      rec.textContent = `정답률이 높아요! 레벨 ${trainLevel + 1}에 도전해 볼까요?`;
+      cardEl.appendChild(rec);
+
+      const upBtn = document.createElement('button');
+      upBtn.className = 'primary'; upBtn.textContent = `레벨 ${trainLevel + 1} 도전`;
+      upBtn.onclick = () => {
+        typeSt.level = Math.min(9, trainLevel + 1); typeSt.done = 0; typeSt.correct = 0;
+        saveTypeProgress();
+        startTraining(trainAxisKey, Math.min(9, trainLevel + 1));
+      };
+      cardEl.appendChild(upBtn);
+    }
+
+    const againBtn = document.createElement('button');
+    againBtn.className = 'secondary'; againBtn.textContent = '같은 레벨 더 풀기';
+    againBtn.onclick = () => { typeSt.done = 0; typeSt.correct = 0; saveTypeProgress(); renderTrainingItem(); };
+    cardEl.appendChild(againBtn);
+
+    const menuBtn2 = document.createElement('button');
+    menuBtn2.className = 'secondary'; menuBtn2.textContent = '유형 목록으로';
+    menuBtn2.onclick = renderTypeMenu;
+    cardEl.appendChild(menuBtn2);
+    return;
   }
 
   if (correct) {
