@@ -1865,7 +1865,21 @@ function renderStartLevelPicker() {
       <p style="font-size:14px;font-weight:600;margin:12px 0 6px;">이 영역은 몇 단계부터 시작할까요?</p>
       <p style="font-size:12.5px;color:#6B7280;line-height:1.6;margin:0 0 14px;">자신 있는 단계를 골라주세요. 맞히면 위로 올라가고, 틀리면 자동으로 맞는 단계를 찾아 내려갑니다. 잘 모르겠으면 1단계를 선택하세요.</p>
       <div style="display:flex;flex-wrap:wrap;">${levelBtns}</div>
-    </div>`;
+    </div>
+    ${isTeacherAccess ? `<div class="card" style="background:#FFF7ED;border:1.5px solid #FDBA74;">
+      <p style="font-size:13px;font-weight:700;color:#9A3412;margin:0 0 4px;">선생님 전용 — 축 바로 가기</p>
+      <p style="font-size:12px;color:#9A3412;line-height:1.6;margin:0 0 10px;">확인하고 싶은 축만 골라 바로 시작합니다. 건너뛴 축은 결과에서 미측정으로 표시됩니다. 학생 화면에는 이 상자가 보이지 않습니다.</p>
+      <div style="display:flex;flex-wrap:wrap;">${AXES.map((a,i)=>`<button class="secondary axisJumpBtn" data-axis="${i}" style="display:inline-block;width:31%;margin:1%;padding:10px 0;font-size:12.5px;${i===axisIdx?'opacity:.45;':''}">${a.name.split(' ')[0]}</button>`).join('')}</div>
+    </div>` : ''}`;
+  document.querySelectorAll('.axisJumpBtn').forEach(btn => {
+    btn.onclick = () => {
+      axisIdx = parseInt(btn.dataset.axis);
+      level = 1; mode = 'first'; confirmCount = 0; confirmCorrect = 0;
+      vocabSub = 0; vocabCorrectCount = 0; vocabPool = [];
+      hasEverSucceeded = false;
+      renderStartLevelPicker();
+    };
+  });
   document.querySelectorAll('.startLevelBtn').forEach(btn => {
     btn.onclick = () => {
       level = parseInt(btn.dataset.level);
@@ -2146,11 +2160,17 @@ function selectVocab(selectedIdx, answerIdx, word, correctText, questionText, st
 async function renderFinal(app) {
   const tierNames = ["","하-하","하-중","하-상","중-하","중-중","중-상","상-하","상-중","상-상"];
   const r = results;
-  const minAxis = Object.keys(r).reduce((a,b)=> r[a]<=r[b]?a:b);
+  // 선생님 모드에서 축을 건너뛴 경우 results가 비어 있을 수 있으므로 기본값을 둔다.
+  const measuredKeys = Object.keys(r);
+  const minAxis = measuredKeys.length ? measuredKeys.reduce((a,b)=> r[a]<=r[b]?a:b) : 'reason';
   const nameMap = {reason:'추론축', vocab:'어휘력축', syntax:'문장해석력축'};
   const rows = ['reason','vocab','syntax'].map(k => {
+    const measured = Object.prototype.hasOwnProperty.call(r, k);
     const mastered = r[k] || 0;
     const trainStart = Math.min(9, mastered + 1);
+    if (!measured) {
+      return `<div class="result-row"><span>${nameMap[k]}</span><span style="text-align:right;color:#9CA3AF;">미측정</span></div>`;
+    }
     return `<div class="result-row">
       <span>${nameMap[k]}</span>
       <span style="text-align:right;">
