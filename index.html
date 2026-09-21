@@ -1737,7 +1737,7 @@ async function renderGrowthChart(p) {
       body: JSON.stringify({ action: 'get_student_history', name: p.name, school: p.school, grade: p.grade, number: p.number })
     });
     const data = await res.json();
-    if (data.status === 'ok') { levelHistory = data.levelHistory || []; activity = data.activity || []; }
+    if (data.status === 'ok') { levelHistory = data.levelHistory || []; activity = (data.activity || []).filter(a => !String(a.axisOrType || a.type || a['유형'] || '').startsWith('신고|')); }
   } catch (e) {
     // 이 기능은 구글시트에서 다른 기기의 기록까지 모아와야만 의미가 있어서(로컬 저장만으로는 대체 불가),
     // 네트워크 요청 자체가 막힌 환경(예: 채팅창 미리보기 안)에서는 항상 이 화면이 뜬다. 실제 버그는 아닐 수 있음.
@@ -2517,7 +2517,7 @@ function myNav(card, code, item){
     if (why===null) return;
     myState.reported[item.id] = Date.now(); mySave();
     rep.textContent='신고했습니다. 선생님이 확인합니다.'; rep.disabled=true;
-    if (GOOGLE_SHEET_WEBHOOK_URL){ try{ await fetch(GOOGLE_SHEET_WEBHOOK_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'log_difficulty_feedback',name:studentName,school:studentSchool,grade:studentGrade,number:studentNumber,axisOrType:'MY-'+code+'-신고',level:9,reasonKey:'report:'+item.id+':'+String(why).slice(0,200)})}); }catch(e){} }
+    if (GOOGLE_SHEET_WEBHOOK_URL){ try{ await fetch(GOOGLE_SHEET_WEBHOOK_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'log_activity',name:studentName,school:studentSchool,grade:studentGrade,number:studentNumber,axisOrType:'신고|MY-'+code+'|'+item.id+'|'+String(why).replace(/\|/g,'/').slice(0,150),level:9,correct:false})}); }catch(e){} }
   };
   card.append(rep);
 }
