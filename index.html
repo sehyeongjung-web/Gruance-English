@@ -1027,6 +1027,7 @@ async function renderDifficultyStats() {
         const data = await res.json();
         if (data.status === 'ok' && Array.isArray(data.rows)) {
           data.rows.forEach(r => {
+            if (String(r.axisOrType||'').startsWith('신고|')) return; // 학생 신고 줄은 통계에서 제외 (‘학생 신고 보기’에서 따로 봄)
             const key = `${r.school}:${r.grade}:${r.number}:${r.name}:${r.axisOrType}:${r.level}`;
             merged[key] = { school: r.school, grade: r.grade, number: r.number, name: r.name, code: r.axisOrType, level: r.level,
               counts: { word: r.word, syntax: r.syntax, reasoning: r.reasoning } };
@@ -1375,9 +1376,11 @@ function renderTeacherTable(profiles) {
       </div>
       <p style="font-size:11.5px;color:#9CA3AF;margin-top:10px;">* 공유 저장소 사용 중 — 이 링크에 접근하는 누구나 이 표를 볼 수 있습니다.</p>
       <button class="secondary" id="diffStatBtn">오답원인 통계 보기 (단어/문장해석/추론)</button>
+      <button class="secondary" id="myReportBtn">🚩 학생 신고 보기 (나만의 연습 문제)</button>
       <button class="secondary" id="backBtn">돌아가기</button>
     </div>`;
   document.getElementById('diffStatBtn').onclick = renderDifficultyStats;
+  { const rb=document.getElementById('myReportBtn'); if(rb) rb.onclick=renderMyReports; }
   document.getElementById('backBtn').onclick = renderIntro;
   attachDeleteHandlers();
   const toggleBtn = document.getElementById('toggleChartBtn');
@@ -2431,6 +2434,7 @@ const MY_POS_KO = {first:"앞", middle:"중간", end:"끝"};
 const MY_CIRC = "①②③④⑤";
 let myState = null;
 let myCurrent = null; // {code, item}
+let myPreview = false; // 선생님 보드에서 문제를 볼 때: 기록하지 않음
 
 function myKey(){ return 'my-practice:' + (studentSchool||'미상') + ':' + (studentGrade||'미상') + ':' + (studentNumber||'미상') + ':' + (studentName||'미상'); }
 async function myLoad(){
@@ -2493,6 +2497,8 @@ async function renderMyMenu(){
 }
 
 function renderMyItem(code){
+  if (!myState){ myLoad().then(()=>renderMyItem(code)); return; }
+  myPreview = false;
   const item = myPick(code); if(!item){ renderMyMenu(); return; }
   myCurrent = {code, item};
   const app = document.getElementById('app'); app.innerHTML='';
@@ -2506,6 +2512,7 @@ function renderMyItem(code){
 }
 
 function myNav(card, code, item){
+  if (myPreview){ const b=myEl('button',null,'신고 목록으로'); b.className='secondary'; b.onclick=renderMyReports; card.append(b); return; }
   const wrap = myEl('div','display:flex;gap:8px;margin-top:14px;');
   const next = myEl('button',null,'다음 문제'); next.className='primary'; next.style.margin='0'; next.onclick=()=>renderMyItem(code);
   const menu = myEl('button',null,'목록'); menu.className='secondary'; menu.style.cssText='margin:0;width:auto;padding:0 16px;'; menu.onclick=renderMyMenu;
@@ -2517,6 +2524,8 @@ function myNav(card, code, item){
     if (why===null) return;
     myState.reported[item.id] = Date.now(); mySave();
     rep.textContent='신고했습니다. 선생님이 확인합니다.'; rep.disabled=true;
+    const repType = '신고|MY-'+code+'|'+item.id+'|'+String(why).replace(/\|/g,'/').slice(0,150);
+    if (GOOGLE_SHEET_WEBHOOK_URL){ try{ await fetch(GOOGLE_SHEET_WEBHOOK_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'log_difficulty_feedback',name:studentName,school:studentSchool,grade:studentGrade,number:studentNumber,axisOrType:repType,level:9,reasonKey:'reasoning'})}); }catch(e){} }
     if (GOOGLE_SHEET_WEBHOOK_URL){ try{ await fetch(GOOGLE_SHEET_WEBHOOK_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'log_activity',name:studentName,school:studentSchool,grade:studentGrade,number:studentNumber,axisOrType:'신고|MY-'+code+'|'+item.id+'|'+String(why).replace(/\|/g,'/').slice(0,150),level:9,correct:false})}); }catch(e){} }
   };
   card.append(rep);
@@ -2551,9 +2560,9 @@ function myRender23(card, item){
     btns[item.ap].style.cssText += 'background:#ECFDF5;border-color:#1D9E75;';
     if(!correct) b.style.cssText += 'background:#FEF2F2;border-color:#DC2626;';
     // 기록
-    const p = myState.pos[item.cp] || (myState.pos[item.cp]=[0,0]); p[1]++; if(correct) p[0]++;
-    if(!correct){ const r=opts[k].role; myState.roles[r]=(myState.roles[r]||0)+1; }
-    myRecord('23', item, correct);
+    if(!myPreview){ const p = myState.pos[item.cp] || (myState.pos[item.cp]=[0,0]); p[1]++; if(correct) p[0]++;
+      if(!correct){ const r=opts[k].role; myState.roles[r]=(myState.roles[r]||0)+1; } }
+    if(!myPreview) myRecord('23', item, correct);
     // 지문에 번호와 주장 문장 표시
     spans.forEach(({sp,sup},i)=>{ sup.style.display='inline'; if(i+1===item.k){ sp.style.background='#FEF3C7'; sp.style.textDecoration='underline'; sp.style.textDecorationColor='#16324F'; sp.style.textUnderlineOffset='4px'; } });
     const fb = myEl('div'); fb.className='feedback '+(correct?'correct':'wrong');
@@ -2595,8 +2604,8 @@ function myRender37(card, item){
     const correct = k===ansIdx;
     btns[ansIdx].style.cssText += 'background:#ECFDF5;border-color:#1D9E75;';
     if(!correct) b.style.cssText += 'background:#FEF2F2;border-color:#DC2626;';
-    myState.ord[1]++; if(correct) myState.ord[0]++;
-    myRecord('36_37', item, correct);
+    if(!myPreview){ myState.ord[1]++; if(correct) myState.ord[0]++; }
+    if(!myPreview) myRecord('36_37', item, correct);
     // 연결 단서(노랑)와 가리키는 대상(초록) 표시
     given.textContent=''; myMarked(given, item.i[0], [{str:item.p[0][3], bg:'#D1FAE5'}]);
     paraEls.forEach(({d,x})=>{ d.textContent=''; d.append(myEl('b','font-family:sans-serif;margin-right:6px;',x.lab));
@@ -2618,6 +2627,59 @@ function myRender37(card, item){
     if(traps.length){ mySection(card,'헷갈리는 순서'); traps.forEach(t=>{ const d=myEl('div','font-size:13.5px;margin-bottom:5px;'); d.append(myEl('b','color:#B91C1C;',MY_CIRC[MY_ORDERS.indexOf(t.o)]+' '+t.o), document.createTextNode(' — '+t.why)); card.append(d); }); }
     myNav(card,'36_37',item);
   }; });
+}
+
+
+// ── 선생님 보드: 학생 신고 보기 ──
+async function renderMyReports(){
+  myPreview = false;
+  const app = document.getElementById('app');
+  app.innerHTML = '<div class="card"><p style="font-size:13px;color:#6B7280;">신고를 불러오는 중...</p></div>';
+  await myLoad();
+  let rows = [];
+  if (GOOGLE_SHEET_WEBHOOK_URL){
+    try{
+      const res = await fetch(GOOGLE_SHEET_WEBHOOK_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'get_difficulty_stats'})});
+      const data = await res.json();
+      if (data.status==='ok' && Array.isArray(data.rows)) rows = data.rows.filter(r => String(r.axisOrType||'').startsWith('신고|'));
+    }catch(e){
+      app.innerHTML = `<div class="card"><p style="font-size:13px;color:#8A1F16;">구글시트에서 신고를 불러오지 못했습니다. 일반 브라우저(크롬 등)에서 다시 열어 주세요.</p><button class="secondary" id="repBack">돌아가기</button></div>`;
+      document.getElementById('repBack').onclick = renderTeacherView; return;
+    }
+  }
+  let checked = {};
+  try{ const r=await appStorage.get('my-report-checked', true); if(r&&r.value) checked=JSON.parse(r.value); }catch(e){}
+  const list = rows.map(r => { const parts=String(r.axisOrType).split('|'); return {code:(parts[1]||'').replace('MY-',''), id:parts[2]||'', why:parts.slice(3).join('|'), r, key:String(r.axisOrType)+'|'+(r.name||'')}; });
+  list.sort((a,b)=> (checked[a.key]?1:0)-(checked[b.key]?1:0));
+  app.innerHTML=''; const card=myEl('div'); card.className='card';
+  card.append(myEl('p','font-size:15px;font-weight:700;margin:0 0 4px;','학생 신고 — 나만의 연습 문제'));
+  const open=list.filter(x=>!checked[x.key]).length;
+  card.append(myEl('p','font-size:12.5px;color:#6B7280;margin:0 0 12px;', list.length?`신고 ${list.length}건 · 확인 안 한 것 ${open}건`:'아직 들어온 신고가 없습니다.'));
+  list.forEach(x=>{
+    const box=myEl('div','border:1px solid '+(checked[x.key]?'#E5E7EB':'#F59E0B')+';border-radius:10px;padding:10px 12px;margin-bottom:8px;background:'+(checked[x.key]?'#F9FAFB':'#FFFBEB')+';');
+    box.append(myEl('div','font-size:13px;font-weight:700;color:#111827;',(x.code==='23'?'23번 주제':'36~37번 순서')+' · 문제 '+x.id));
+    box.append(myEl('div','font-size:12.5px;color:#374151;margin-top:3px;','이유: '+(x.why||'(적지 않음)')));
+    box.append(myEl('div','font-size:11.5px;color:#6B7280;margin-top:3px;',[x.r.name,x.r.school,x.r.grade,x.r.number].filter(Boolean).join(' · ')+(x.r.count||x.r.reasoning>1?` · ${x.r.reasoning}회`:'')));
+    const row=myEl('div','display:flex;gap:8px;margin-top:8px;');
+    const item=(MY_BANK[x.code]||[]).find(it=>it.id===x.id);
+    const view=myEl('button','flex:1;padding:8px;border-radius:8px;border:1px solid #16324F;background:#fff;color:#16324F;font-size:12.5px;cursor:pointer;', item?'문제 보기':'문제를 찾을 수 없음');
+    view.disabled=!item; view.onclick=()=>myPreviewItem(x.code,item,x.why);
+    const chk=myEl('button','flex:1;padding:8px;border-radius:8px;border:1px solid #D1D5DB;background:#fff;color:#374151;font-size:12.5px;cursor:pointer;', checked[x.key]?'확인 취소':'확인함');
+    chk.onclick=async()=>{ if(checked[x.key]) delete checked[x.key]; else checked[x.key]=Date.now(); try{ await appStorage.set('my-report-checked', JSON.stringify(checked), true);}catch(e){} renderMyReports(); };
+    row.append(view,chk); box.append(row); card.append(box);
+  });
+  const back=myEl('button',null,'돌아가기'); back.className='secondary'; back.onclick=renderTeacherView; card.append(back);
+  app.append(card);
+}
+function myPreviewItem(code, item, why){
+  myPreview = true; myCurrent = {code, item};
+  const app=document.getElementById('app'); app.innerHTML='';
+  const card=myEl('div'); card.className='card';
+  card.append(myEl('div','font-size:12.5px;background:#FFFBEB;border:1px solid #F59E0B;border-radius:8px;padding:8px 10px;margin-bottom:10px;color:#92400E;','학생 신고 이유: '+(why||'(적지 않음)')+' — 아래는 학생에게 보이는 그대로이며, 정답과 해설을 펼쳐 두었습니다. (선생님 보기는 기록되지 않습니다)'));
+  app.append(card);
+  if(code==='23') myRender23(card,item); else myRender37(card,item);
+  const ans = code==='23' ? item.ap : MY_ORDERS.indexOf(item.tg);
+  const btns=card.querySelectorAll('.choice'); if(btns[ans]) btns[ans].click();
 }
 
 // ===== 유형 선택 화면 (25개 유형 목록) =====
