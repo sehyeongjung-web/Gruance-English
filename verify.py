@@ -122,6 +122,42 @@ def check_set(code, lv, items, errors, warnings):
             warnings.append('%s: 평균 %.0f단어 (목표 약 %.0f단어)' % (tag, avg, target))
 
 
+
+# ───────── 레벨테스트(진단) 문항 검사 — 2026-09-21 추가 ─────────
+# 배경: shuffleSingle이 q.answer를 무시하고 첫 선택지를 정답으로 채점해,
+# 레벨5~9 진단 101문항이 정답·오답이 뒤바뀌어 채점된 사고가 있었다.
+def check_diagnostic(c, errors, warns):
+    import json as _j, re as _r
+    def grab(name):
+        i=c.find('const '+name+' ='); st=c.find('{',i); d=0; j=st
+        while j<len(c):
+            if c[j]=='{': d+=1
+            elif c[j]=='}':
+                d-=1
+                if d==0: break
+            j+=1
+        return _j.loads(c[st:j+1])
+    if 'Number.isInteger(q.answer)' not in c:
+        errors.append('진단 채점: shuffleSingle이 q.answer를 따르지 않음 (정답이 첫 자리가 아닌 문항이 오답 처리됨)')
+    TAIL=_r.compile(r'(는|은) 점(이|을) .{2,20}(확인된다|드러난다|밝히고 있다)$|이번 결과의 핵심이다$')
+    for name in ['REASON_BANK','REASON_CONFIRM','SYNTAX_BANK','SYNTAX_CONFIRM']:
+        B=grab(name)
+        for lv,items in B.items():
+            for n,x in enumerate(items):
+                tag='%s L%s #%d'%(name,lv,n)
+                ch=x.get('choices',[]); a=x.get('answer',0)
+                if len(ch)!=5: errors.append(tag+': 선택지 %d개'%len(ch))
+                if len(set(ch))!=len(ch): errors.append(tag+': 선택지 중복')
+                if not (isinstance(a,int) and 0<=a<len(ch)): errors.append(tag+': 정답 번호 범위 밖')
+                for k,t in enumerate(ch):
+                    if TAIL.search(t): errors.append(tag+': %d번 선택지에 길이 늘리기용 꼬리 문구'%(k+1))
+    V=grab('VOCAB_BANK')
+    for lv,items in V.items():
+        for n,(w,s,chs) in enumerate(items):
+            opts=[o.strip() for o in _r.split(r'[①②③④⑤]',chs) if o.strip()]
+            if len(opts)!=5 or len(set(opts))!=5: errors.append('VOCAB_BANK L%s #%d (%s): 뜻 선택지 형식 오류'%(lv,n,w))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('path')
@@ -149,6 +185,7 @@ def main():
     if not a.quiet_warnings and warnings:
         print('\n[경고] %d건 — 확인 권장' % len(warnings))
         for w in warnings: print('  ! ' + w)
+    check_diagnostic(raw, errors, warnings)
     if errors:
         print('\n[오류] %d건 — 적용 불가' % len(errors))
         for e in errors: print('  X ' + e)
