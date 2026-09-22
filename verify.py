@@ -157,6 +157,36 @@ def check_diagnostic(c, errors, warns):
             opts=[o.strip() for o in _r.split(r'[①②③④⑤]',chs) if o.strip()]
             if len(opts)!=5 or len(set(opts))!=5: errors.append('VOCAB_BANK L%s #%d (%s): 뜻 선택지 형식 오류'%(lv,n,w))
 
+    # ── 길이 단서 검사 (2026-09-22 추가) ──
+    # 문제를 읽지 않고 「가장 긴 것」「두 번째로 긴 것」「가장 짧은 것」만 골라도 통과하는 일이 없도록 한다.
+    def strat_rate(opts_ans):
+        out={}
+        for key in ('가장 긴 것','두 번째로 긴 것','가장 짧은 것'):
+            tot=0.0
+            for o,a in opts_ans:
+                L=[len(x) for x in o]; u=sorted(set(L),reverse=True)
+                t={'가장 긴 것':u[0],'두 번째로 긴 것':u[1] if len(u)>1 else u[0],'가장 짧은 것':u[-1]}[key]
+                cand=[i for i,l in enumerate(L) if l==t]; tot+=(1.0/len(cand) if a in cand else 0)
+            out[key]=100*tot/len(opts_ans)
+        return out
+    def rank_of(o,a): return 1+sum(1 for k,z in enumerate(o) if k!=a and len(z)>len(o[a]))
+    for name in ['REASON_CONFIRM','SYNTAX_CONFIRM']:
+        B=grab(name)
+        for lv,items in B.items():
+            for key,r in strat_rate([(x['choices'],x.get('answer',0)) for x in items]).items():
+                if r>40: errors.append('%s L%s: 「%s」만 골라도 %.0f%% 정답 (40%% 이하여야 함)'%(name,lv,key,r))
+    for name in ['REASON_BANK','SYNTAX_BANK']:
+        B=grab(name)
+        for lv,items in B.items():
+            rk=[rank_of(x['choices'],x.get('answer',0)) for x in items]
+            if len(rk)>1 and len(set(rk))==1: errors.append('%s L%s: 첫 시도 문항의 정답 길이 순위가 모두 %d위 (같은 요령으로 항상 통과)'%(name,lv,rk[0]))
+    for lv,items in V.items():
+        oa=[([o.strip() for o in _r.split(r'[①②③④⑤]',chs) if o.strip()],0) for w,s,chs in items]
+        for key,r in strat_rate(oa).items():
+            if r>40: errors.append('VOCAB_BANK L%s: 「%s」만 골라도 %.0f%% 정답 (40%% 이하여야 함)'%(lv,key,r))
+    if '문항 ${vocabSub+1}/3<' in c:
+        errors.append('어휘 진단 화면: 문항 번호가 「/3」으로 표시됨 (VOCAB_TOTAL을 써야 함)')
+
 
 def main():
     ap = argparse.ArgumentParser()
