@@ -4005,7 +4005,8 @@ function renderCodeGate(errorMsg) {
   };
   const input = document.getElementById('accessCodeInput');
   const submit = async () => {
-    const code = input.value.trim();
+    // 화면에는 대문자로 보여도 실제 입력은 소문자일 수 있으므로 대문자로 맞추고, 빈칸은 없앤다
+    const code = input.value.trim().toUpperCase().replace(/\s+/g, '');
     if (!code) return;
     const btn = document.getElementById('verifyCodeBtn');
     btn.disabled = true; btn.textContent = '확인 중...';
