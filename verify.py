@@ -191,20 +191,23 @@ def check_diagnostic(c, errors, warns):
 # ── 길이 점검표 (2026-10-01 추가) ─────────────────────────────
 # 진행 상황을 기억이나 기록이 아니라 지금 파일을 직접 재서 판단하기 위한 표.
 # 칸마다 두 조건을 모두 만족하면 ✅, 못 맞춘 조건의 글자를 표시:
-#   A = 정답이 가장 긴/두 번째로 긴 선택지인 문항이 16개를 넘음
+#   A = 정답이 가장 긴/두 번째로 긴 선택지인 문항이 16개를 넘거나,
+#       정답이 가장 긴 선택지인 문항만 따로 세어 8개를 넘음 (2026-10-01 추가)
 #   B = 혼자 튀게 긴 선택지(가장 긴 것이 두 번째보다 1.3배 이상)가 있는 문항이 2개를 넘음
 # (정답과 1자 차이 나는 오답은 눈으로 구별되지 않아 단서가 되지 않으므로 조건에서 뺌)
 LEN_TYPES = ['18','19','20','21','22','23','24','26','27_28','31','32','33','34','40','41','45']
 
 def length_cell(items):
-    a = b = c = 0
+    a = a1 = b = c = 0
     for it in items:
         ch = it['choices']; k = it['answer']; L = len(ch[k])
-        if 1 + sum(len(x) > L for i, x in enumerate(ch) if i != k) <= 2: a += 1
+        r = 1 + sum(len(x) > L for i, x in enumerate(ch) if i != k)
+        if r <= 2: a += 1
+        if r == 1: a1 += 1
         ls = sorted((len(x) for x in ch), reverse=True)
         if ls[1] and ls[0] / ls[1] >= 1.3: b += 1
         if min(abs(len(x) - L) for i, x in enumerate(ch) if i != k) < 2: c += 1
-    bad = ('A' if a > 16 else '') + ('B' if b > 2 else '')
+    bad = ('A' if a > 16 or a1 > 8 else '') + ('B' if b > 2 else '')
     return bad, (a, b, c)
 
 def length_table(tb):
