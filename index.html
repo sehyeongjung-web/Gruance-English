@@ -987,6 +987,81 @@ async function renderWelcomeBack(remembered) {
   document.getElementById('notMeBtn').onclick = () => renderIntroForm();
 }
 
+// ===== 학년·반·번호 선택 버튼 =====
+const PICK_GRADES = [['1학년', '고1'], ['2학년', '고2'], ['3학년', '고3']];
+const PICK_CLASS_MAX = 9, PICK_NUM_MAX = 29;
+let pickState = { cls: null, num: null, legacy: '' };
+function _escPick(v) { return String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function parseClassNumber(v) {
+  const m = String(v || '').match(/^\s*(\d{1,2})\s*반\s*(\d{1,2})\s*번\s*$/);
+  if (!m) return null;
+  const c = +m[1], n = +m[2];
+  return (c >= 1 && c <= PICK_CLASS_MAX && n >= 1 && n <= PICK_NUM_MAX) ? { c, n } : null;
+}
+function pickBtnStyle(on) {
+  return 'border:1.5px solid ' + (on ? '#16324F' : '#D1D5DB') + ';background:' + (on ? '#16324F' : '#fff') + ';color:' + (on ? '#fff' : '#374151') + ';border-radius:10px;padding:11px 0;font-size:14px;font-weight:600;cursor:pointer;';
+}
+// 입력칸(숨김)에 이미 들어 있는 값에서 선택 상태를 읽는다 - 이름찾기·기기기억으로 채워진 값, 예전 형식의 값도 그대로 보존한다.
+function pickFromValue() {
+  const nIn = document.getElementById('numberInput');
+  const v = ((nIn && nIn.value) || '').trim();
+  const p = parseClassNumber(v);
+  pickState = p ? { cls: p.c, num: p.n, legacy: '' } : { cls: null, num: null, legacy: v };
+}
+function pickCompose() {
+  const nIn = document.getElementById('numberInput');
+  if (pickState.cls && pickState.num) nIn.value = pickState.cls + '반 ' + pickState.num + '번';
+  else if (pickState.legacy) nIn.value = pickState.legacy;
+  else nIn.value = '';
+}
+// 필수 항목을 안 골랐을 때: 해당 칸을 빨갛게 표시하고 바로 아래에 안내를 보여 준다.
+function flagPick(id, msg) {
+  const box = document.getElementById(id === 'gradeInput' ? 'gradePickBox' : 'numberPickBox');
+  if (!box) return;
+  box.style.outline = '2px solid #B42318'; box.style.outlineOffset = '3px'; box.style.borderRadius = '10px';
+  let m = box.parentNode.querySelector('.pickMsg[data-for="' + id + '"]');
+  if (!m) { m = document.createElement('p'); m.className = 'pickMsg'; m.setAttribute('data-for', id); m.style.cssText = 'font-size:12.5px;color:#B42318;margin:6px 0 0;'; box.insertAdjacentElement('afterend', m); }
+  m.textContent = msg;
+  if (box.scrollIntoView) box.scrollIntoView({ block: 'center' });
+}
+function drawPick() {
+  const gIn = document.getElementById('gradeInput'), nIn = document.getElementById('numberInput');
+  const gBox = document.getElementById('gradePickBox'), nBox = document.getElementById('numberPickBox');
+  if (!gIn || !nIn || !gBox || !nBox) return;
+  // 학년
+  const gv = gIn.value;
+  let gHtml = PICK_GRADES.map(([label, val]) => `<button type="button" class="pickBtn" data-g="${val}" style="${pickBtnStyle(gv === val)}">${label}</button>`).join('');
+  if (gv && !PICK_GRADES.some(([, val]) => val === gv)) {
+    gHtml += `<button type="button" class="pickBtn" data-g="${_escPick(gv)}" style="${pickBtnStyle(true)}">${_escPick(gv)} (기존 입력)</button>`;
+  }
+  gBox.style.cssText = 'margin-top:6px;display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;';
+  gBox.innerHTML = gHtml;
+  gBox.querySelectorAll('.pickBtn').forEach(btn => {
+    btn.onclick = () => { gIn.value = btn.getAttribute('data-g'); drawPick(); };
+  });
+  // 반 / 번호
+  const classBtns = Array.from({ length: PICK_CLASS_MAX }, (_, i) => i + 1).map(c => `<button type="button" class="pickBtn" data-c="${c}" style="${pickBtnStyle(pickState.cls === c)}">${c}반</button>`).join('');
+  const numBtns = Array.from({ length: PICK_NUM_MAX }, (_, i) => i + 1).map(n => `<button type="button" class="pickBtn" data-n="${n}" style="${pickBtnStyle(pickState.num === n)}">${n}번</button>`).join('');
+  const grid = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:6px;';
+  let status;
+  if (pickState.cls && pickState.num) status = `<span style="color:#175C3A;font-weight:700;">선택: ${pickState.cls}반 ${pickState.num}번</span>`;
+  else if (pickState.legacy) status = `<span style="color:#9A3412;">예전에 입력한 값 <b>${_escPick(pickState.legacy)}</b>을(를) 그대로 쓰는 중입니다. 바꾸려면 아래에서 반과 번호를 고르세요.</span>`;
+  else status = `<span style="color:#6B7280;">반과 번호를 모두 눌러 골라 주세요.</span>`;
+  nBox.style.cssText = 'margin-top:6px;';
+  nBox.innerHTML = `<p style="font-size:12px;color:#6B7280;margin:0 0 4px;">반</p><div style="${grid}">${classBtns}</div>
+    <p style="font-size:12px;color:#6B7280;margin:10px 0 4px;">번호</p><div style="${grid}">${numBtns}</div>
+    <p style="font-size:12.5px;margin:8px 0 0;">${status}</p>`;
+  nBox.querySelectorAll('.pickBtn').forEach(btn => {
+    btn.onclick = () => {
+      if (btn.hasAttribute('data-c')) pickState.cls = parseInt(btn.getAttribute('data-c'), 10);
+      else pickState.num = parseInt(btn.getAttribute('data-n'), 10);
+      pickState.legacy = '';
+      pickCompose(); drawPick();
+    };
+  });
+  document.querySelectorAll('.pickMsg').forEach(m => { const id = m.getAttribute('data-for'); if ((document.getElementById(id) || {}).value) { m.remove(); const b = document.getElementById(id === 'gradeInput' ? 'gradePickBox' : 'numberPickBox'); if (b) b.style.outline = ''; } });
+}
+
 function renderIntroForm() {
   const app = document.getElementById('app');
   const missionBanner = `<div class="card" style="background:#EEF2FF;border:1.5px solid #A5B4FC;margin-bottom:10px;">
@@ -1014,18 +1089,11 @@ function renderIntroForm() {
     <label style="font-size:13px;font-weight:600;color:#4B5563;display:block;margin-top:12px;">학교 / 소속</label>
     <input type="text" id="schoolInput" placeholder="예: OO고등학교 또는 OO학원" value="${studentSchool ? studentSchool.replace(/"/g,'&quot;') : ''}" style="width:100%;padding:11px 12px;border-radius:10px;border:1px solid #D1D5DB;margin-top:6px;font-size:14px;">
     <label style="font-size:13px;font-weight:600;color:#4B5563;display:block;margin-top:12px;">학년</label>
-    <select id="gradeInput" style="width:100%;padding:11px 12px;border-radius:10px;border:1px solid #D1D5DB;margin-top:6px;font-size:14px;background:#fff;">
-      <option value="">선택해주세요</option>
-      <option value="중1" ${studentGrade==='중1'?'selected':''}>중1</option>
-      <option value="중2" ${studentGrade==='중2'?'selected':''}>중2</option>
-      <option value="중3" ${studentGrade==='중3'?'selected':''}>중3</option>
-      <option value="고1" ${studentGrade==='고1'?'selected':''}>고1</option>
-      <option value="고2" ${studentGrade==='고2'?'selected':''}>고2</option>
-      <option value="고3" ${studentGrade==='고3'?'selected':''}>고3</option>
-      <option value="N수생" ${studentGrade==='N수생'?'selected':''}>N수생(재수생 이상)</option>
-    </select>
+    <input type="hidden" id="gradeInput" value="${studentGrade ? studentGrade.replace(/"/g,'&quot;') : ''}">
+    <div id="gradePickBox" style="margin-top:6px;"></div>
     <label style="font-size:13px;font-weight:600;color:#4B5563;display:block;margin-top:12px;">반 / 번호</label>
-    <input type="text" id="numberInput" placeholder="예: 3반 15번" value="${studentNumber ? studentNumber.replace(/"/g,'&quot;') : ''}" style="width:100%;padding:11px 12px;border-radius:10px;border:1px solid #D1D5DB;margin-top:6px;font-size:14px;">
+    <input type="hidden" id="numberInput" value="${studentNumber ? studentNumber.replace(/"/g,'&quot;') : ''}">
+    <div id="numberPickBox" style="margin-top:6px;"></div>
     <p style="font-size:14px;line-height:1.6;margin-top:14px;">3개 축을 순서대로 진행합니다. 각 축은 1단계부터 시작해서, 맞으면 다음 단계로 올라갑니다. 틀리면 같은 레벨에서 확인문항 ${CONFIRM_TOTAL}개를 더 풀고(${CONFIRM_PASS}개 이상 맞으면 통과), 그래도 안 되면 그 축이 종료됩니다.</p>
     <p style="font-size:13px;line-height:1.6;color:#6B7280;">결과는 '확정 레벨'(확실히 아는 단계)과 '훈련시작 레벨'(지금 도전해야 할 단계)을 함께 보여드립니다. 완료하면 결과가 자동 저장됩니다.</p>
     <button class="primary" id="startBtn">시작하기</button>
@@ -1035,6 +1103,7 @@ function renderIntroForm() {
     ${isTeacherAccess ? '<button class="secondary" id="teacherBtn">선생님 모드</button>' : ''}
   </div>`;
   if (isTeacherAccess) document.getElementById('teacherBtn').onclick = renderTeacherView;
+  pickFromValue(); drawPick();
   const doLookup = async () => {
     const nameEl2 = document.getElementById('lookupNameInput');
     const resultArea = document.getElementById('lookupResultArea');
@@ -1079,6 +1148,7 @@ function renderIntroForm() {
     document.getElementById('schoolInput').value = p.school || '';
     document.getElementById('gradeInput').value = p.grade || '';
     document.getElementById('numberInput').value = p.number || '';
+    pickFromValue(); drawPick();
   }
   document.getElementById('lookupBtn').onclick = doLookup;
   document.getElementById('lookupNameInput').onkeydown = (e) => { if (e.key === 'Enter') doLookup(); };
@@ -1089,7 +1159,7 @@ function renderIntroForm() {
     const grade = document.getElementById('gradeInput').value;
     const number = (document.getElementById('numberInput').value || '').trim();
     if (!name || !school || !grade || !number) {
-      showIntroMessage('이름/학교/학년/반·번호를 먼저 입력해주세요 (처음 시작할 때와 똑같이 입력해야 해요).');
+      showIntroMessage('이름·학교를 입력하고 학년·반·번호를 눌러 먼저 골라주세요 (처음 시작할 때와 똑같이 골라야 해요).');
       return;
     }
     restartLevelTestFor(name, school, grade, number, () => { studentName = name; studentSchool = school; studentGrade = grade; studentNumber = number; renderIntroForm(); });
@@ -1119,8 +1189,8 @@ function renderIntroForm() {
     studentNumber = (numberEl.value || '').trim();
     if (!studentName) { nameEl.style.borderColor = '#B42318'; nameEl.placeholder = '이름을 입력해주세요'; return; }
     if (!studentSchool) { schoolEl.style.borderColor = '#B42318'; schoolEl.placeholder = '학교/소속을 입력해주세요'; return; }
-    if (!studentGrade) { gradeEl.style.borderColor = '#B42318'; return; }
-    if (!studentNumber) { numberEl.style.borderColor = '#B42318'; numberEl.placeholder = '반/번호를 입력해주세요'; return; }
+    if (!studentGrade) { flagPick('gradeInput', '학년을 눌러 골라 주세요.'); return; }
+    if (!studentNumber) { flagPick('numberInput', '반과 번호를 모두 눌러 골라 주세요.'); return; }
     // 이 기기에 프로필을 기억해둔다(다른 사람과 공유되지 않는 이 기기 전용 저장) - 다음에 올 때 바로 이어서 시작할 수 있도록
     appStorage.set('device-last-profile', JSON.stringify({name:studentName, school:studentSchool, grade:studentGrade, number:studentNumber}), false).catch(()=>{});
     // 이미 진행하다 저장해둔 기록이 있으면(예: 이름찾기로 들어온 기존 학생) 그걸 이어서 보여주고,
@@ -2394,7 +2464,7 @@ const isTeacherAccess = new URLSearchParams(window.location.search).get('admin')
 // true로 두면 학생은 접속 시 "정교하게 수정 중" 안내만 보고 앱을 이용할 수 없습니다.
 // 선생님 모드(?admin=...)는 이 스위치와 무관하게 항상 정상 접속됩니다.
 // 보강 작업이 끝나면 이 값을 false로 바꾸고 재배포하면 학생 접속이 다시 열립니다.
-const MAINTENANCE_MODE = true;
+const MAINTENANCE_MODE = false;
 // ▼▼▼ 공개 레벨 범위 ▼▼▼
 // 연습문제(훈련·유형별 연습)에서 학생에게 여는 레벨 범위.
 // 진단 테스트는 630문항이 모두 정비되어 있으므로 1~9단계 전부 열려 있다.
