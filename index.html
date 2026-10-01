@@ -733,9 +733,72 @@ async function fetchSessionStateFromSheet(kind, name, school, grade, number) {
       body: JSON.stringify({ action: 'get_session_state', kind: kind, name, school, grade, number })
     });
     const data = await res.json();
-    if (data.status === 'ok' && data.stateJson) return JSON.parse(data.stateJson);
+    if (data.status === 'ok' && data.stateJson) { const st = JSON.parse(data.stateJson); return (st && st.cleared) ? null : st; }
     return null;
   } catch (e) { return null; }
+}
+
+// ===== 레벨 테스트 처음부터 다시 하기 =====
+// 중간에 저장해 둔 진행을 지운다. 이 기기 저장은 지우고, 다른 기기용 구글시트 백업에는 "지움" 표시를 덮어써서
+// 다음에 불러와도 옛 진행이 되살아나지 않게 한다(시트 쪽 지우기 기능이 없어도 동작).
+const SAVE_KEY_PREFIX = { diag: 'session-save:', training: 'training-save:', typetest: 'typetest-save:' };
+async function clearSavedProgressFor(name, school, grade, number, kinds) {
+  const suffix = school + ':' + grade + ':' + number + ':' + name;
+  for (const kind of kinds) {
+    try { await appStorage.delete(SAVE_KEY_PREFIX[kind] + suffix, true); } catch (e) { /* 없으면 그대로 */ }
+    syncSessionStateToSheet(kind, { cleared: true, studentName: name, studentSchool: school, studentGrade: grade, studentNumber: number, timestamp: new Date().toISOString() });
+    clearSessionStateOnSheet(kind, name, school, grade, number);
+  }
+}
+function resetDiagnosticState() {
+  axisIdx = 0; level = 1; mode = 'first'; confirmCount = 0; confirmCorrect = 0;
+  vocabSub = 0; vocabCorrectCount = 0; vocabPool = []; hasEverSucceeded = false; axisLog = [];
+  Object.keys(results).forEach(k => delete results[k]);
+  bankPickIdx = 0; confirmSetIndices = [...Array(CONFIRM_TOTAL).keys()];
+  lastFirstRenderKey = null; lastConfirmRoundKey = null;
+}
+// 1단계: 안내(공지) 화면 → 2단계: 한 번 더 확인 → 지우고 새 레벨 테스트. 어느 단계에서든 취소하면 아무것도 지우지 않고 돌아간다.
+function restartLevelTestFor(name, school, grade, number, onCancel) {
+  const app = document.getElementById('app');
+  const back = () => { if (typeof onCancel === 'function') onCancel(); else renderIntro(); };
+  const esc = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const who = `${esc(name)}님 (${esc(school) || '-'} · ${esc(grade) || '-'} · ${esc(number) || '-'})`;
+  app.innerHTML = `<div class="card" style="padding:22px 18px;">
+    <p style="font-size:16px;font-weight:700;margin:0 0 6px;">레벨 테스트를 처음부터 다시 하기 전에 꼭 읽어 주세요</p>
+    <p style="font-size:13px;color:#6B7280;margin:0 0 12px;">${who}</p>
+    <div style="background:#FFF7ED;border:1px solid #FDBA74;border-radius:10px;padding:12px 14px;font-size:13.5px;line-height:1.75;color:#7C2D12;">
+      <p style="margin:0 0 6px;font-weight:700;">다시 시작하면 아래 기록이 지워집니다.</p>
+      <p style="margin:0;">· 중간에 저장해 둔 레벨 테스트 진행<br>· 중간에 저장해 둔 훈련(유형 훈련·승급테스트) 진행<br>· 유형별 훈련 레벨 (새 레벨 테스트 결과에 맞춰 다시 정해집니다)</p>
+      <p style="margin:8px 0 0;">지운 진행은 <b>다른 기기(폰·태블릿·컴퓨터)에서도 다시 불러올 수 없습니다.</b></p>
+    </div>
+    <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:12px 14px;font-size:13.5px;line-height:1.75;color:#14532D;margin-top:10px;">
+      <p style="margin:0 0 6px;font-weight:700;">그대로 남는 것</p>
+      <p style="margin:0;">· 틀렸던 문제 복습 목록</p>
+    </div>
+    <p style="font-size:12.5px;color:#6B7280;line-height:1.6;margin:10px 0 0;">지난 레벨 테스트 결과는 새 레벨 테스트를 마치면 새 결과로 바뀝니다.</p>
+    <button class="primary" id="restartNextBtn" style="margin-top:14px;">내용을 읽었어요. 다음으로</button>
+    <button class="secondary" id="restartCancelBtn1">취소하고 돌아가기</button>
+  </div>`;
+  document.getElementById('restartCancelBtn1').onclick = back;
+  document.getElementById('restartNextBtn').onclick = () => {
+    app.innerHTML = `<div class="card" style="text-align:center;padding:26px 18px;">
+      <p style="font-size:17px;font-weight:700;margin:0 0 8px;">정말 처음부터 다시 시작할까요?</p>
+      <p style="font-size:13.5px;color:#374151;line-height:1.7;margin:0 0 6px;">${who}의 저장된 진행을 지우고 레벨 테스트를 새로 시작합니다.</p>
+      <p style="font-size:13.5px;color:#B42318;font-weight:700;margin:0 0 16px;">지운 진행은 되돌릴 수 없습니다.</p>
+      <button id="restartConfirmBtn" style="width:100%;background:#B42318;color:#fff;border:none;border-radius:10px;padding:13px 12px;font-size:14.5px;font-weight:700;cursor:pointer;margin-bottom:8px;">네, 지우고 처음부터 시작할게요</button>
+      <button class="secondary" id="restartCancelBtn2">아니요, 그만둘게요</button>
+    </div>`;
+    document.getElementById('restartCancelBtn2').onclick = back;
+    document.getElementById('restartConfirmBtn').onclick = async (ev) => {
+      ev.currentTarget.disabled = true; ev.currentTarget.textContent = '지우는 중...';
+      studentName = name; studentSchool = school; studentGrade = grade; studentNumber = number;
+      appStorage.set('device-last-profile', JSON.stringify({ name, school, grade, number }), false).catch(() => {});
+      await clearSavedProgressFor(name, school, grade, number, ['diag', 'training', 'typetest']);
+      typeProgress = {}; saveTypeProgress(); typeProgressLoaded = true;
+      resetDiagnosticState();
+      renderStartLevelPicker();
+    };
+  };
 }
 
 async function resumeSessionFor(name, school, grade, number) {
@@ -906,6 +969,7 @@ async function renderWelcomeBack(remembered) {
     <p style="font-size:13px;color:#6B7280;margin:0 0 6px;">${remembered.school||'-'} · ${remembered.grade||'-'} · ${remembered.number||'-'}</p>
     ${commentHtml}
     <button class="primary" id="continueAsBtn">이어서 시작하기</button>
+    <button class="secondary" id="restartAsBtn">🔄 레벨 테스트 처음부터 다시 하기</button>
     <button class="secondary" id="notMeBtn">다른 사람이에요 (새로 입력)</button>
   </div>`;
   document.getElementById('continueAsBtn').onclick = async () => {
@@ -919,6 +983,7 @@ async function renderWelcomeBack(remembered) {
       renderStartLevelPicker();
     }
   };
+  document.getElementById('restartAsBtn').onclick = () => restartLevelTestFor(remembered.name, remembered.school, remembered.grade, remembered.number, () => renderWelcomeBack(remembered));
   document.getElementById('notMeBtn').onclick = () => renderIntroForm();
 }
 
@@ -965,6 +1030,7 @@ function renderIntroForm() {
     <p style="font-size:13px;line-height:1.6;color:#6B7280;">결과는 '확정 레벨'(확실히 아는 단계)과 '훈련시작 레벨'(지금 도전해야 할 단계)을 함께 보여드립니다. 완료하면 결과가 자동 저장됩니다.</p>
     <button class="primary" id="startBtn">시작하기</button>
     <button class="secondary" id="resumeBtn">↻ 저장된 진행 이어하기</button>
+    <button class="secondary" id="restartTestBtn">🔄 레벨 테스트 처음부터 다시 하기</button>
     <button class="secondary" id="reviewBtn">📝 복습하기 (틀렸던 문제 다시 풀기)</button>
     ${isTeacherAccess ? '<button class="secondary" id="teacherBtn">선생님 모드</button>' : ''}
   </div>`;
@@ -1017,6 +1083,17 @@ function renderIntroForm() {
   document.getElementById('lookupBtn').onclick = doLookup;
   document.getElementById('lookupNameInput').onkeydown = (e) => { if (e.key === 'Enter') doLookup(); };
   document.getElementById('resumeBtn').onclick = tryResumeSession;
+  document.getElementById('restartTestBtn').onclick = async () => {
+    const name = (document.getElementById('nameInput').value || '').trim();
+    const school = (document.getElementById('schoolInput').value || '').trim();
+    const grade = document.getElementById('gradeInput').value;
+    const number = (document.getElementById('numberInput').value || '').trim();
+    if (!name || !school || !grade || !number) {
+      showIntroMessage('이름/학교/학년/반·번호를 먼저 입력해주세요 (처음 시작할 때와 똑같이 입력해야 해요).');
+      return;
+    }
+    restartLevelTestFor(name, school, grade, number, () => { studentName = name; studentSchool = school; studentGrade = grade; studentNumber = number; renderIntroForm(); });
+  };
   document.getElementById('reviewBtn').onclick = () => {
     const nameEl = document.getElementById('nameInput');
     const schoolEl = document.getElementById('schoolInput');
@@ -2289,6 +2366,7 @@ async function renderFinal(app) {
 
   try {
     await saveProfilePartial();
+    clearSavedProgressFor(studentName, studentSchool, studentGrade, studentNumber, ['diag']);
     document.getElementById('saveStatus').innerHTML = `<p style="font-size:12px;color:#175C3A;margin-top:10px;">결과가 저장되었습니다. (선생님 모드에서 확인 가능)</p>`;
   } catch (e) {
     document.getElementById('saveStatus').innerHTML = `<p style="font-size:12px;color:#8A1F16;margin-top:10px;">저장 실패: ${e}</p>`;
