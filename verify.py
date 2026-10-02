@@ -197,11 +197,16 @@ def check_diagnostic(c, errors, warns):
 #   C = 가장 긴 선택지가 나머지 넷의 가운데 길이보다 1.4배 이상 긴 문항이 하나라도 있음 (2026-10-02 추가, 144번)
 #       B는 '긴 오답 둘이 나란히 있는 경우'를 놓치므로, 나머지 선택지의 보통 길이와 견주는 조건을 더함.
 #       낱말 하나짜리 선택지처럼 차이가 5자 미만이면 눈에 띄지 않으므로 세지 않음.
+#   D = 정답이 가장 긴/두 번째로 긴 선택지인 문항이 5개 미만 (2026-10-02 추가, 149번)
+#       정답이 긴 쪽에 '한 번도' 오지 않으면 "긴 것 둘은 답이 아니다"가 요령이 됨.
+#       선생님 원칙: 긴 자리를 피하되 가끔은 와도 됨 — 예외 없는 규칙은 그 자체가 단서.
+#   E = 정답만 혼자 눈에 띄게 짧은 문항이 하나라도 있음 (2026-10-02 추가, 152번 — 선생님 승인 "E 추가")
+#       정답이 다른 넷 모두보다 짧고, 나머지 넷의 가운데 길이가 정답의 1.4배 이상(차이 5자 이상)인 경우.
 # (정답과 1자 차이 나는 오답은 눈으로 구별되지 않아 단서가 되지 않으므로 조건에서 뺌)
 LEN_TYPES = ['18','19','20','21','22','23','24','26','27_28','31','32','33','34','40','41','45']
 
 def length_cell(items):
-    a = a1 = b = c = cc = 0
+    a = a1 = b = c = cc = ee = 0
     for it in items:
         ch = it['choices']; k = it['answer']; L = len(ch[k])
         r = 1 + sum(len(x) > L for i, x in enumerate(ch) if i != k)
@@ -211,24 +216,28 @@ def length_cell(items):
         if ls[1] and ls[0] / ls[1] >= 1.3: b += 1
         med = (ls[2] + ls[3]) / 2          # 가장 긴 것을 뺀 나머지 넷의 가운데 값
         if med and ls[0] / med >= 1.4 and ls[0] - med >= 5: cc += 1
+        oth = sorted(len(x) for i, x in enumerate(ch) if i != k)   # 정답을 뺀 넷
+        if L < oth[0]:
+            om = (oth[1] + oth[2]) / 2
+            if L and om / L >= 1.4 and om - L >= 5: ee += 1
         if min(abs(len(x) - L) for i, x in enumerate(ch) if i != k) < 2: c += 1
-    bad = ('A' if a > 16 or a1 > 8 else '') + ('B' if b > 2 else '') + ('C' if cc > 0 else '')
-    return bad, (a, b, c, cc)
+    bad = ('A' if a > 16 or a1 > 8 else '') + ('B' if b > 2 else '') + ('C' if cc > 0 else '') + ('D' if a < 5 else '') + ('E' if ee > 0 else '')
+    return bad, (a, b, c, cc, ee)
 
 def length_table(tb):
-    print('\n[길이 점검표] ✅=끝남 / A=정답이 가장 긴·두 번째로 긴 선택지인 문항 과다 · B=혼자 튀게 긴 선택지 · C=나머지보다 1.4배 이상 긴 선택지')
-    print('유형   ' + ' '.join('L%d  ' % i for i in range(1, 10)) + ' 끝난 칸   (C 문항 수)')
-    done_all = 0; c_all = 0
+    print('\n[길이 점검표] ✅=끝남 / A=정답이 가장 긴·두 번째로 긴 선택지인 문항 과다 · B=혼자 튀게 긴 선택지 · C=나머지보다 1.4배 이상 긴 선택지 · D=정답이 긴 쪽에 거의 안 옴 · E=정답만 혼자 짧음')
+    print('유형   ' + ' '.join('L%d    ' % i for i in range(1, 10)) + ' 끝난 칸   (C·E 문항 수)')
+    done_all = 0; c_all = 0; e_all = 0
     for t in LEN_TYPES:
         if t not in tb: continue
-        cells = []; done = 0; c_row = 0
+        cells = []; done = 0; c_row = 0; e_row = 0
         for lv in range(1, 10):
             bad, cnt = length_cell(tb[t][str(lv)])
-            cells.append(('✅  ' if not bad else bad.ljust(3) + ' '))
-            done += (not bad); c_row += cnt[3]
-        done_all += done; c_all += c_row
-        print('%-6s ' % t + ' '.join(cells) + '  %d/9      %4d' % (done, c_row))
-    print('전체 %d/%d칸 끝남 · C에 걸리는 문항 %d개 남음' % (done_all, 9 * len([t for t in LEN_TYPES if t in tb]), c_all))
+            cells.append(('✅    ' if not bad else bad.ljust(5) + ' '))
+            done += (not bad); c_row += cnt[3]; e_row += cnt[4]
+        done_all += done; c_all += c_row; e_all += e_row
+        print('%-6s ' % t + ' '.join(cells) + '  %d/9      %4d · %d' % (done, c_row, e_row))
+    print('전체 %d/%d칸 끝남 · C에 걸리는 문항 %d개 · E에 걸리는 문항 %d개 남음' % (done_all, 9 * len([t for t in LEN_TYPES if t in tb]), c_all, e_all))
 
 
 def main():
