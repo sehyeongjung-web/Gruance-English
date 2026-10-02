@@ -194,11 +194,14 @@ def check_diagnostic(c, errors, warns):
 #   A = 정답이 가장 긴/두 번째로 긴 선택지인 문항이 16개를 넘거나,
 #       정답이 가장 긴 선택지인 문항만 따로 세어 8개를 넘음 (2026-10-01 추가)
 #   B = 혼자 튀게 긴 선택지(가장 긴 것이 두 번째보다 1.3배 이상)가 있는 문항이 2개를 넘음
+#   C = 가장 긴 선택지가 나머지 넷의 가운데 길이보다 1.4배 이상 긴 문항이 하나라도 있음 (2026-10-02 추가, 144번)
+#       B는 '긴 오답 둘이 나란히 있는 경우'를 놓치므로, 나머지 선택지의 보통 길이와 견주는 조건을 더함.
+#       낱말 하나짜리 선택지처럼 차이가 5자 미만이면 눈에 띄지 않으므로 세지 않음.
 # (정답과 1자 차이 나는 오답은 눈으로 구별되지 않아 단서가 되지 않으므로 조건에서 뺌)
 LEN_TYPES = ['18','19','20','21','22','23','24','26','27_28','31','32','33','34','40','41','45']
 
 def length_cell(items):
-    a = a1 = b = c = 0
+    a = a1 = b = c = cc = 0
     for it in items:
         ch = it['choices']; k = it['answer']; L = len(ch[k])
         r = 1 + sum(len(x) > L for i, x in enumerate(ch) if i != k)
@@ -206,24 +209,26 @@ def length_cell(items):
         if r == 1: a1 += 1
         ls = sorted((len(x) for x in ch), reverse=True)
         if ls[1] and ls[0] / ls[1] >= 1.3: b += 1
+        med = (ls[2] + ls[3]) / 2          # 가장 긴 것을 뺀 나머지 넷의 가운데 값
+        if med and ls[0] / med >= 1.4 and ls[0] - med >= 5: cc += 1
         if min(abs(len(x) - L) for i, x in enumerate(ch) if i != k) < 2: c += 1
-    bad = ('A' if a > 16 or a1 > 8 else '') + ('B' if b > 2 else '')
-    return bad, (a, b, c)
+    bad = ('A' if a > 16 or a1 > 8 else '') + ('B' if b > 2 else '') + ('C' if cc > 0 else '')
+    return bad, (a, b, c, cc)
 
 def length_table(tb):
-    print('\n[길이 점검표] ✅=끝남 / A=정답이 가장 긴·두 번째로 긴 선택지인 문항 과다 · B=혼자 튀게 긴 선택지')
-    print('유형   ' + ' '.join('L%d ' % i for i in range(1, 10)) + ' 끝난 칸')
-    done_all = 0
+    print('\n[길이 점검표] ✅=끝남 / A=정답이 가장 긴·두 번째로 긴 선택지인 문항 과다 · B=혼자 튀게 긴 선택지 · C=나머지보다 1.4배 이상 긴 선택지')
+    print('유형   ' + ' '.join('L%d  ' % i for i in range(1, 10)) + ' 끝난 칸   (C 문항 수)')
+    done_all = 0; c_all = 0
     for t in LEN_TYPES:
         if t not in tb: continue
-        cells = []; done = 0
+        cells = []; done = 0; c_row = 0
         for lv in range(1, 10):
-            bad, _ = length_cell(tb[t][str(lv)])
-            cells.append(('✅ ' if not bad else bad.ljust(2) + ' '))
-            done += (not bad)
-        done_all += done
-        print('%-6s ' % t + ' '.join(cells) + '  %d/9' % done)
-    print('전체 %d/%d칸 끝남' % (done_all, 9 * len([t for t in LEN_TYPES if t in tb])))
+            bad, cnt = length_cell(tb[t][str(lv)])
+            cells.append(('✅  ' if not bad else bad.ljust(3) + ' '))
+            done += (not bad); c_row += cnt[3]
+        done_all += done; c_all += c_row
+        print('%-6s ' % t + ' '.join(cells) + '  %d/9      %4d' % (done, c_row))
+    print('전체 %d/%d칸 끝남 · C에 걸리는 문항 %d개 남음' % (done_all, 9 * len([t for t in LEN_TYPES if t in tb]), c_all))
 
 
 def main():
