@@ -33,7 +33,7 @@ bash /home/claude/work/setup.sh
 | `check_all.py` | **한 번에 점검**: 앱 코드 불변, 바뀐 문항 수, node --check, verify.py, verify_explain.py |
 | `dump.py` | 문항 읽기: `python3 dump.py 24 3 200 all 60` (유형, 레벨, 지문 길이, all=전체, 해설 길이) |
 | `qcheck.py` | 길이 작업용 인용 대조(레벨별): `python3 qcheck.py out/index.html 3` |
-| `examples/` | 실제로 쓴 수정안 파일 4개(형식 참고용) |
+| `examples/` | 실제로 쓴 수정안 파일 9개(형식 참고용). `edits_Y1~Y5`는 170~174번 틀 재작성(순서·지칭·일치, 레벨3·4) 본보기 — 도우미 함수로 본문·해석·풀이·해설을 자동 조립하는 방식 |
 
 `verify.py`(형식·길이 점검표)와 `verify_explain.py`(선택지-해설 대조)는 저장소에 있는 것을 씁니다.
 
