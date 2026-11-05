@@ -3732,6 +3732,10 @@ function renderMyItem(code){
   card.append(head);
   app.append(card);
   if (code==='23') myRender23(card, item); else if (code==='blank') myRenderBlank(card, item); else if (code==='38_39') myRender39(card, item); else if (code==='40') myRender40(card, item); else if (code==='41_42') myRender41(card, item); else if (code==='21') myRender21(card, item); else if (code==='35') myRender35(card, item); else myRender37(card, item);
+  // 푸는 도중에도 다른 연습으로 갈 수 있게, 문제 카드 아래에 단추 카드를 따로 둔다(풀이 뒤 해설은 위 카드에 이어 붙는다)
+  const _navCard = myEl('div'); _navCard.className = 'card'; _navCard.innerHTML = practiceNavHtml('my');
+  const _navIn = _navCard.firstElementChild; if (_navIn) _navIn.style.cssText += 'margin-top:0;padding-top:0;border-top:none;';
+  app.append(_navCard); bindPracticeNav(_navCard);
 }
 
 function myNav(card, code, item){
@@ -3740,7 +3744,6 @@ function myNav(card, code, item){
   const next = myEl('button',null,'다음 문제'); next.className='primary'; next.style.margin='0'; next.onclick=()=>renderMyItem(code);
   const menu = myEl('button',null,'목록'); menu.className='secondary'; menu.style.cssText='margin:0;width:auto;padding:0 16px;'; menu.onclick=renderMyMenu;
   wrap.append(next, menu); card.append(wrap);
-  const _pn = myEl('div'); _pn.innerHTML = practiceNavHtml('my'); card.append(_pn); bindPracticeNav(_pn);
   const rep = myEl('button','background:none;border:none;color:#9CA3AF;font-size:12px;margin-top:10px;cursor:pointer;text-decoration:underline;', myState.reported[item.id]?'신고했습니다. 선생님이 확인합니다.':'이 문제가 이상해요 (신고)');
   rep.disabled = !!myState.reported[item.id];
   rep.onclick = async ()=>{
