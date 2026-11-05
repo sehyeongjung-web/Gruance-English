@@ -3240,9 +3240,15 @@ async function renderFinal(app) {
       <div id="saveStatus">${saveStatusHtml}</div>
       ${renderTypeLevelTable(r)}
       <button class="primary" id="trainBtn">병목축(${nameMap[minAxis]}) 훈련 시작하기 →</button>
+      ${practiceNavHtml(null)}
       <button class="secondary" id="restartBtn">메인 화면으로</button>
+      ${studentName ? '<button class="secondary" id="retakeTestBtn">🔄 레벨 테스트 다시 하기</button>' : ''}
     </div>`;
   document.getElementById('restartBtn').onclick = renderIntro;
+  bindPracticeNav(app);
+  // 결과 화면에서 바로 다시 보기. 안내 → 한 번 더 확인을 거치고, 취소하면 이 결과 화면으로 돌아온다(이미 끝낸 결과이므로 다시 저장·기록하지 않는다).
+  const retakeBtn = document.getElementById('retakeTestBtn');
+  if (retakeBtn) retakeBtn.onclick = () => restartLevelTestFor(studentName, studentSchool, studentGrade, studentNumber, () => { diagRestoredDone = true; renderFinal(document.getElementById('app')); });
   document.getElementById('trainBtn').onclick = () => startTraining(minAxis, Math.min(9, (r[minAxis]||0)+1));
   document.querySelectorAll('.typeRowBtn').forEach(btn => {
     btn.onclick = async () => {
@@ -3707,6 +3713,7 @@ async function renderMyMenu(){
   const s42 = stat('41_42');
   const tweak = (()=>{ const r=Object.entries(myState.troles||{}).sort((a,b)=>b[1]-a[1])[0]; return r&&r[1]>=2?(' · 자주 빠지는 제목 함정: '+MY_TROLE_KO[r[0]]):''; })();
   card.append(btn('41·42번 장문 (제목 · 낱말 쓰임)', `${s42.total}세트 중 ${s42.done}세트 풀이${s42.done?` · 두 문제 모두 맞힌 비율 ${s42.rate}%`:''}${tweak}`, '41_42'));
+  const _pn = myEl('div'); _pn.innerHTML = practiceNavHtml('my'); card.append(_pn); bindPracticeNav(_pn);
   const back = myEl('button',null,'유형 목록으로'); back.className='secondary'; back.style.marginTop='6px'; back.onclick = renderTypeMenu;
   card.append(back);
   app.append(card);
@@ -3733,6 +3740,7 @@ function myNav(card, code, item){
   const next = myEl('button',null,'다음 문제'); next.className='primary'; next.style.margin='0'; next.onclick=()=>renderMyItem(code);
   const menu = myEl('button',null,'목록'); menu.className='secondary'; menu.style.cssText='margin:0;width:auto;padding:0 16px;'; menu.onclick=renderMyMenu;
   wrap.append(next, menu); card.append(wrap);
+  const _pn = myEl('div'); _pn.innerHTML = practiceNavHtml('my'); card.append(_pn); bindPracticeNav(_pn);
   const rep = myEl('button','background:none;border:none;color:#9CA3AF;font-size:12px;margin-top:10px;cursor:pointer;text-decoration:underline;', myState.reported[item.id]?'신고했습니다. 선생님이 확인합니다.':'이 문제가 이상해요 (신고)');
   rep.disabled = !!myState.reported[item.id];
   rep.onclick = async ()=>{
@@ -4303,6 +4311,8 @@ async function renderTypeMenu() {
         <span style="font-size:13.5px;font-weight:700;color:#92400E;">✨ 나만의 연습 문제</span>
         <span style="display:block;font-size:11.5px;color:#92400E;margin-top:2px;">21 · 23 · 31~35 · 36~40 · 41~42번 · 레벨9 · 문장별 해석과 푸는 방법까지</span>
       </button>
+      ${practiceNavHtml('type', ['my'])}
+      <div style="height:12px;"></div>
       ${rows}
       <button class="secondary" id="typeMenuBack" style="margin-top:6px;">처음으로</button>
     </div>`;
@@ -4319,6 +4329,7 @@ async function renderTypeMenu() {
   });
   document.getElementById('typeMenuBack').onclick = renderIntro;
   const myBtn = document.getElementById('myPracticeBtn'); if (myBtn) myBtn.onclick = renderMyMenu;
+  bindPracticeNav(app);
 }
 
 function renderTypePractice() {
@@ -4522,9 +4533,55 @@ function shuffleArr(arr) {
   return a;
 }
 
+// ===== 연습 분야 바로가기 (2026-11-05) =====
+// 어느 연습 화면에서든 다른 연습 분야(어휘력·문장해석력·추론력·번호별·나만의 연습 문제)로 곧바로 넘어가는 버튼 묶음.
+// 축(어휘력·문장해석력·추론력)은 이번 접속에서 마지막으로 연습한 레벨로, 처음이면 레벨 테스트 결과의 「훈련시작」 레벨로 간다.
+const lastAxisLevel = {};
+function axisStartLevel(axis) {
+  if (lastAxisLevel[axis]) return lastAxisLevel[axis];
+  const m = (typeof results !== 'undefined' && results && results[axis] != null) ? Number(results[axis]) : 0;
+  return Math.max(1, Math.min(9, (isFinite(m) ? m : 0) + 1));
+}
+const PRACTICE_NAV = [
+  { key: 'vocab',  label: '📖 어휘력' },
+  { key: 'syntax', label: '✍️ 문장해석력' },
+  { key: 'reason', label: '🧠 추론력' },
+  { key: 'type',   label: '📋 번호별(18~45번)' },
+  { key: 'my',     label: '✨ 나만의 연습 문제' },
+];
+// current: 지금 있는 분야(진하게 표시, 눌러도 아무 일 없음). 번호 하나를 풀고 있을 때는 null을 넣는다.
+// hide: 이 화면에 이미 같은 버튼이 있어서 뺄 분야.
+function practiceNavHtml(current, hide) {
+  const skip = hide || [];
+  const chips = PRACTICE_NAV.filter(n => skip.indexOf(n.key) < 0).map(n => {
+    const on = n.key === current;
+    const look = on
+      ? 'background:#16324F;color:#fff;border:1px solid #16324F;cursor:default;'
+      : 'background:#fff;color:#16324F;border:1px solid #C7D2E0;cursor:pointer;';
+    return `<button type="button" class="pnavBtn" data-pnav="${n.key}"${on ? ' aria-current="true"' : ''} style="display:inline-block;width:auto;margin:0;padding:7px 11px;font-size:12.5px;font-weight:600;border-radius:999px;${look}">${n.label}</button>`;
+  }).join('');
+  return `<div class="pnav" style="margin-top:14px;padding-top:12px;border-top:1px dashed #E5E7EB;text-align:left;">
+    <p style="font-size:12px;color:#6B7280;margin:0 0 8px;">다른 연습으로 바로 가기</p>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;">${chips}</div>
+  </div>`;
+}
+function bindPracticeNav(root) {
+  (root || document).querySelectorAll('.pnavBtn').forEach(b => {
+    if (b.getAttribute('aria-current') === 'true') return;
+    b.onclick = () => {
+      try { stopSpeaking(); } catch (e) { /* 읽어 주던 소리가 없으면 그대로 */ }
+      const k = b.dataset.pnav;
+      if (k === 'type') renderTypeMenu();
+      else if (k === 'my') renderMyMenu();
+      else startTraining(k, axisStartLevel(k));
+    };
+  });
+}
+
 function startTraining(axisKey, level) {
   trainAxisKey = axisKey;
   trainLevel = clampLevel(Math.max(1, Math.min(9, level)));
+  if (axisKey === 'reason' || axisKey === 'vocab' || axisKey === 'syntax') lastAxisLevel[axisKey] = trainLevel;
   trainMode = 'practice';
   trainPool = shuffleArr(buildTrainPool(axisKey, trainLevel));
   trainIdx = 0;
@@ -4755,6 +4812,11 @@ function renderTrainingItem() {
     toMenuBtn.textContent = '📋 유형 목록으로';
     toMenuBtn.onclick = renderTypeMenu;
     document.querySelector('.card').appendChild(toMenuBtn);
+  }
+  if (trainMode === 'practice') {
+    const _navCard = document.querySelector('.card');
+    _navCard.insertAdjacentHTML('beforeend', practiceNavHtml(isAxisTrain ? trainAxisKey : null));
+    bindPracticeNav(_navCard);
   }
   const exitBtn = document.createElement('button');
   exitBtn.className = 'secondary';
@@ -5194,6 +5256,7 @@ function renderTrainingSummary(app) {
       <p style="font-size:13.5px;color:${verdictColor};margin:0 0 18px;">${verdict}</p>
       ${trainPool.length < 4 ? '<p style="font-size:11px;color:#9CA3AF;margin:0 0 12px;">* 이 유형은 레벨당 문항이 아직 적어 판정 신뢰도가 낮습니다. 문항 확충 예정입니다.</p>' : ''}
       ${actionHtml}
+      ${practiceNavHtml(['reason','vocab','syntax'].includes(trainAxisKey) ? trainAxisKey : null)}
       <button class="secondary" id="endTrainBtn">훈련 종료 (처음으로)</button>
     </div>`;
 
@@ -5210,6 +5273,7 @@ function renderTrainingSummary(app) {
     };
   }
   document.getElementById('endTrainBtn').onclick = renderIntro;
+  bindPracticeNav(app);
 }
 
 // ===== 문항유형별 진단 (18~30번대, 실제 유형 형식) =====
