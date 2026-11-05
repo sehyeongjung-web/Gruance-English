@@ -4266,6 +4266,8 @@ async function renderTypeMenu() {
   const r = (typeof results !== 'undefined' && results) ? results : {};
   const reason = r.reason || 0, vocab = r.vocab || 0, syntax = r.syntax || 0;
 
+  await loadWrongNote();
+  const wnCount = wnLiveEntries().length;
   const doneCount = TYPE_LEVEL_FORMULAS.filter(f => getTypeState(f.code).completed).length;
   const totalCount = TYPE_LEVEL_FORMULAS.length;
 
@@ -4314,6 +4316,10 @@ async function renderTypeMenu() {
         <span style="font-size:13.5px;font-weight:700;color:#92400E;">✨ 나만의 연습 문제</span>
         <span style="display:block;font-size:11.5px;color:#92400E;margin-top:2px;">21 · 23 · 31~35 · 36~40 · 41~42번 · 레벨9 · 문장별 해석과 푸는 방법까지</span>
       </button>
+      <button id="wrongNoteBtn" style="display:block;width:100%;text-align:left;background:#FEF2F2;border:2px solid #FCA5A5;border-radius:10px;padding:11px 12px;margin-bottom:10px;cursor:pointer;">
+        <span style="font-size:13.5px;font-weight:700;color:#991B1B;">📕 틀린 문제 다시 보기</span>
+        <span style="display:block;font-size:11.5px;color:#991B1B;margin-top:2px;">${wnCount ? `${wnCount}문항 모여 있어요 · 다시 풀어 맞히면 빠져요` : '번호별 연습에서 틀린 문제가 여기에 모여요'}</span>
+      </button>
       ${practiceNavHtml('type', ['my'])}
       <div style="height:12px;"></div>
       ${rows}
@@ -4333,6 +4339,7 @@ async function renderTypeMenu() {
   document.getElementById('typeMenuBack').onclick = renderIntro;
   const myBtn = document.getElementById('myPracticeBtn'); if (myBtn) myBtn.onclick = renderMyMenu;
   bindPracticeNav(app);
+  const wnBtn = document.getElementById('wrongNoteBtn'); if (wnBtn) wnBtn.onclick = () => renderWrongNote();
 }
 
 function renderTypePractice() {
@@ -4534,6 +4541,278 @@ function shuffleArr(arr) {
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
+}
+
+// ===== 번호별 「틀린 문제 다시 보기」 (2026-11-05, 인계문서 452번) =====
+// 번호별(18~45번) 연습 · 승급테스트에서 틀린 「바로 그 문제」를 이 기기에 모아 두었다가 다시 풀게 한다.
+// (처음 화면의 「복습하기」는 번호 · 레벨만 기억해 3일 뒤 같은 칸의 다른 문제를 낸다 — 그것은 그대로 둔다)
+// 다시 풀어 맞히면 목록에서 빠지고, 또 틀리면 남는다.
+// 다른 방이 문제를 고쳐 쓰면(지문 · 보기 · 정답이 바뀌면) 담을 때 적어 둔 내용 요약(wnHash)과 달라지므로 목록에서 저절로 빠진다.
+const WRONG_NOTE_MAX = 300;
+let wrongNote = null, wrongNoteOwner = '', wrongNoteLoading = null;
+let currentTrainItem = null; // 연습 화면에 지금 떠 있는 문제(틀리면 이것을 담는다)
+function wrongNoteStoreKey() { return 'type-wrong:' + studentSchool + ':' + studentGrade + ':' + studentNumber + ':' + studentName; }
+function wnHash(it) {
+  const s = String((it && it.text) || '') + '\u0001' + ((it && it.choices) || []).join('\u0001') + '\u0001' + (it ? it.answer : '');
+  let h = 5381;
+  for (let k = 0; k < s.length; k++) h = ((h << 5) + h + s.charCodeAt(k)) | 0;
+  return (h >>> 0).toString(36) + ':' + s.length;
+}
+function loadWrongNote() {
+  const owner = wrongNoteStoreKey();
+  if (wrongNoteLoading && wrongNoteOwner === owner) return wrongNoteLoading;
+  wrongNoteOwner = owner;
+  wrongNoteLoading = (async () => {
+    let v = {};
+    if (studentName) {
+      try {
+        const r = await appStorage.get(owner, false);
+        const p = r && r.value ? JSON.parse(r.value) : null;
+        if (p && typeof p === 'object') v = p;
+      } catch (e) { /* 아직 담긴 문제가 없음 */ }
+    }
+    if (wrongNoteOwner === owner) wrongNote = v;
+    return v;
+  })();
+  return wrongNoteLoading;
+}
+function saveWrongNote() {
+  if (!studentName || !wrongNote) return;
+  try { appStorage.set(wrongNoteOwner, JSON.stringify(wrongNote), false).catch(() => {}); } catch (e) { /* 저장 실패해도 공부는 계속 */ }
+}
+async function addToWrongNote(trainItem, myAnswer) {
+  if (!studentName || !trainItem || trainItem._ec == null) return;
+  const bankItem = ((TYPE_BANK[trainItem._ec] || {})[trainItem._el] || [])[trainItem._ei];
+  if (!bankItem) return;
+  await loadWrongNote();
+  const note = wrongNote; if (!note) return;
+  const k = trainItem._ec + '|' + trainItem._el + '|' + trainItem._ei;
+  const h = wnHash(bankItem);
+  const prev = note[k];
+  note[k] = { c: String(trainItem._ec), l: String(trainItem._el), i: trainItem._ei, h: h,
+              n: (prev && prev.h === h ? (prev.n || 0) : 0) + 1, t: Date.now(), my: String(myAnswer || '').slice(0, 200) };
+  const keys = Object.keys(note);
+  if (keys.length > WRONG_NOTE_MAX) {
+    keys.sort((a, b) => (note[a].t || 0) - (note[b].t || 0)).slice(0, keys.length - WRONG_NOTE_MAX).forEach(x => delete note[x]);
+  }
+  saveWrongNote();
+}
+// 담아 둔 문제를 지금 문제 은행에서 찾는다(자리가 옮겨졌으면 같은 칸에서 다시 찾고, 고쳐져서 없으면 null)
+function wnResolve(e) {
+  const arr = (TYPE_BANK[e.c] || {})[e.l] || [];
+  if (arr[e.i] && wnHash(arr[e.i]) === e.h) return { item: arr[e.i], i: e.i };
+  for (let j = 0; j < arr.length; j++) if (wnHash(arr[j]) === e.h) return { item: arr[j], i: j };
+  return null;
+}
+// 지금 풀 수 있는 것만(최근에 틀린 것부터). code를 주면 그 번호만.
+function wnLiveEntries(code) {
+  const note = wrongNote || {};
+  let changed = false;
+  const out = [];
+  Object.keys(note).forEach(k => {
+    const e = note[k];
+    if (!e || !e.c) { delete note[k]; changed = true; return; }
+    const r = wnResolve(e);
+    if (!r) { delete note[k]; changed = true; return; }
+    if (r.i !== e.i) { delete note[k]; e.i = r.i; note[e.c + '|' + e.l + '|' + r.i] = e; changed = true; }
+    if (!code || e.c === code) out.push(e);
+  });
+  if (changed) saveWrongNote();
+  return out.sort((a, b) => (b.t || 0) - (a.t || 0));
+}
+function wnEsc(v) { return String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+// 연습 화면의 「이 번호 틀린 문제 다시 보기」 단추
+function appendWrongNoteButton(container, code) {
+  const b = document.createElement('button');
+  b.className = 'secondary';
+  b.id = 'wrongNoteHereBtn';
+  b.style.cssText = 'margin-top:6px;border-color:#FCA5A5;color:#991B1B;';
+  b.textContent = '📕 이 번호 틀린 문제 다시 보기';
+  container.appendChild(b);
+  loadWrongNote().then(() => {
+    const n = wnLiveEntries(code).length;
+    b.textContent = n ? `📕 이 번호 틀린 문제 다시 보기 (${n}문항)` : '📕 이 번호 틀린 문제 다시 보기 (아직 없어요)';
+  });
+  b.onclick = async () => {
+    try { stopSpeaking(); } catch (e) { /* 읽어 주던 소리가 없으면 그대로 */ }
+    await loadWrongNote();
+    const list = wnLiveEntries(code);
+    if (list.length) startWrongNoteSession(list, () => renderTrainingItem(), '연습으로 돌아가기');
+    else renderWrongNote();
+  };
+}
+
+// 틀린 문제 목록 화면
+async function renderWrongNote() {
+  const app = document.getElementById('app');
+  app.innerHTML = `<div class="card"><p style="font-size:13px;color:#6B7280;">틀린 문제를 불러오는 중...</p></div>`;
+  await loadWrongNote();
+  const list = wnLiveEntries();
+  const groups = {};
+  list.forEach(e => { const g = e.c + '|' + e.l; (groups[g] = groups[g] || []).push(e); });
+  const order = TYPE_LEVEL_FORMULAS.map(f => f.code);
+  const gkeys = Object.keys(groups).sort((a, b) => {
+    const pa = a.split('|'), pb = b.split('|');
+    return (order.indexOf(pa[0]) - order.indexOf(pb[0])) || (Number(pa[1]) - Number(pb[1]));
+  });
+  const rowsHtml = gkeys.map(g => {
+    const p = g.split('|');
+    return `<button class="wnGroupBtn" data-g="${wnEsc(g)}" style="display:flex;align-items:center;gap:9px;width:100%;background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:10px 12px;margin-bottom:6px;cursor:pointer;text-align:left;">
+      <span style="font-size:13px;color:#111827;">${wnEsc(typeDisplayName(p[0]))}</span>
+      <span style="font-size:11.5px;color:#6B7280;">레벨 ${wnEsc(p[1])}</span>
+      <span style="margin-left:auto;font-size:12px;font-weight:600;color:#991B1B;">${groups[g].length}문항 →</span>
+    </button>`;
+  }).join('');
+  const body = list.length
+    ? `<button class="primary" id="wnAllBtn" style="margin:0 0 12px;">전체 다시 풀기 (${list.length}문항 · 최근에 틀린 것부터)</button>${rowsHtml}`
+    : `<div style="background:#F9FAFB;border:1px dashed #D1D5DB;border-radius:10px;padding:16px;text-align:center;font-size:13px;line-height:1.7;color:#6B7280;">아직 틀린 문제가 없어요.<br>번호별 연습에서 틀린 문제가 여기에 모입니다.</div>`;
+  app.innerHTML = `<div class="card">
+    <p style="font-size:16px;font-weight:700;color:#991B1B;margin:0 0 4px;">📕 틀린 문제 다시 보기</p>
+    <p style="font-size:12.5px;color:#6B7280;line-height:1.6;margin:0 0 12px;">번호별 연습과 승급테스트에서 틀린 문제를 모아 두었어요. 다시 풀어 맞히면 목록에서 빠지고, 또 틀리면 남아요.</p>
+    ${body}
+    ${studentName ? '' : '<p style="font-size:12px;color:#B45309;margin:10px 0 0;">이름을 넣고 시작해야 틀린 문제가 모입니다.</p>'}
+    <p style="font-size:11.5px;color:#9CA3AF;margin:10px 0 0;">이 기기(이 브라우저)에 저장됩니다. 다른 폰 · 컴퓨터에서는 따로 모입니다.</p>
+    ${practiceNavHtml(null, ['type'])}
+    <button class="secondary" id="wnBackBtn">📋 번호별 목록으로</button>
+  </div>`;
+  const all = document.getElementById('wnAllBtn');
+  if (all) all.onclick = () => startWrongNoteSession(list, renderWrongNote, '틀린 문제 목록으로');
+  app.querySelectorAll('.wnGroupBtn').forEach(b => { b.onclick = () => startWrongNoteSession(groups[b.dataset.g] || [], renderWrongNote, '틀린 문제 목록으로'); });
+  document.getElementById('wnBackBtn').onclick = renderTypeMenu;
+  bindPracticeNav(app);
+}
+
+let wnSession = [], wnIdx = 0, wnRight = 0, wnBack = null, wnBackLabel = '';
+function startWrongNoteSession(entries, back, backLabel) {
+  wnSession = entries.slice(); wnIdx = 0; wnRight = 0;
+  wnBack = back || renderWrongNote; wnBackLabel = backLabel || '틀린 문제 목록으로';
+  renderWrongNoteItem();
+}
+function renderWrongNoteItem() {
+  const app = document.getElementById('app');
+  if (wnIdx >= wnSession.length) { renderWrongNoteSummary(); return; }
+  const e = wnSession[wnIdx];
+  const r = wnResolve(e);
+  if (!r) { wnIdx++; renderWrongNoteItem(); return; }
+  e.i = r.i;
+  const item = r.item;
+  const idx = [0, 1, 2, 3, 4].slice(0, item.choices.length);
+  for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+  const shown = idx.map(i => item.choices[i]);
+  const ans = idx.indexOf(item.answer);
+  const exSrc = (TYPE_EXPLAIN[e.c] && TYPE_EXPLAIN[e.c][e.l] && TYPE_EXPLAIN[e.c][e.l][r.i]) || null;
+  const ex = exSrc ? { ko: exSrc.ko, walk: exSrc.walk, notes: idx.map((o, sI) => ({ num: sI + 1, note: (exSrc.cn || [])[o] || '', correct: sI === ans })) } : null;
+  app.innerHTML = `<div class="card">
+    <span class="badge" style="background:#FEE2E2;color:#991B1B;">📕 틀린 문제 다시 풀기 · ${wnEsc(typeDisplayName(e.c))}</span>
+    <span style="font-size:12.5px;color:#6B7280;">레벨 ${wnEsc(e.l)} · ${wnIdx + 1}/${wnSession.length} · 지금까지 ${e.n || 1}번 틀림</span>
+    <div class="passage">${passageWithChart(item.text)}</div>
+    ${item.q ? `<div class="qtext">${item.q}</div>` : ''}
+    <button id="wnSpeakBtn" style="background:#EEF2FF;color:#3730A3;border:1px solid #C7D2FE;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;margin:6px 0;">🔊 지문 듣기</button>
+    <div id="choices"></div>
+  </div>`;
+  const card = app.querySelector('.card');
+  document.getElementById('wnSpeakBtn').onclick = () => speakText(item.text);
+  appendTranslateButton(card, item.text, shown);
+  appendWordLookupButton(card, item.text, () => renderWrongNoteItem());
+  const correctText = item.correctWord || shown[ans];
+  const wrap = document.getElementById('choices');
+  shown.forEach((c, i) => {
+    const b = document.createElement('button');
+    b.className = 'choice'; b.textContent = `${i + 1}. ${c}`;
+    b.onclick = () => { try { stopSpeaking(); } catch (x) {} selectWrongNoteAnswer(e, item, i === ans, shown[i], correctText, ex); };
+    wrap.appendChild(b);
+  });
+  appendDontKnowButton(wrap, () => { try { stopSpeaking(); } catch (x) {} selectWrongNoteAnswer(e, item, false, '(모르겠음)', correctText, ex); });
+  const quit = document.createElement('button');
+  quit.className = 'secondary'; quit.id = 'wnQuitBtn'; quit.style.marginTop = '10px';
+  quit.textContent = '↩ ' + wnBackLabel;
+  quit.onclick = () => { try { stopSpeaking(); } catch (x) {} wnBack(); };
+  card.appendChild(quit);
+}
+function selectWrongNoteAnswer(e, item, correct, chosen, correctText, ex) {
+  const card = document.querySelector('#app .card');
+  document.querySelectorAll('#choices .choice').forEach(b => b.disabled = true);
+  const prevMy = e.my || '';
+  const k = e.c + '|' + e.l + '|' + e.i;
+  if (correct) wnRight++;
+  if (wrongNote) {
+    if (correct) delete wrongNote[k];
+    else { const cur = wrongNote[k] || e; cur.n = (cur.n || 0) + 1; cur.t = Date.now(); cur.my = String(chosen || '').slice(0, 200); wrongNote[k] = cur; }
+    saveWrongNote();
+  }
+  try { logActivity(e.c, Number(e.l), correct); } catch (x) { /* 기록 실패해도 계속 */ }
+  if (!correct) logWrongAnswer(e.c, Number(e.l), item.text, chosen, correctText, '틀린 문제 다시 풀기');
+
+  const fb = document.createElement('div');
+  fb.className = 'feedback ' + (correct ? 'correct' : 'wrong');
+  fb.innerHTML = correct
+    ? '맞혔어요! 이 문제는 「틀린 문제」 목록에서 빠집니다.'
+    : `아직 어려워요. 정답: ${wnEsc(correctText)}<br><span style="font-size:12.5px;">목록에 그대로 남겨 둘게요.</span>`;
+  card.appendChild(fb);
+  if (prevMy) {
+    const p = document.createElement('p');
+    p.style.cssText = 'font-size:12.5px;color:#6B7280;margin:6px 0 0;';
+    p.textContent = '지난번에 고른 답: ' + (prevMy === '(모르겠음)' ? '「잘 모르겠어요」를 눌렀어요' : prevMy);
+    card.appendChild(p);
+  }
+  if (ex) {
+    const escapeHtml = v => String(v == null ? '' : v).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+    const explWrap = document.createElement('div');
+    const explBtn = document.createElement('button');
+    explBtn.textContent = '📖 해설 보기 (본문 해석 · 선택지별 설명 · 푸는 방법)';
+    explBtn.style.cssText = 'background:#EFF6FF;color:#1E3A8A;border:1px solid #BFDBFE;border-radius:8px;padding:8px 12px;font-size:12.5px;cursor:pointer;margin:8px 0 4px;width:100%;text-align:left;';
+    const explBody = document.createElement('div');
+    explBody.style.cssText = 'display:none;margin-top:6px;font-size:13px;line-height:1.6;color:#1F2937;';
+    let opened = false;
+    explBtn.onclick = () => {
+      opened = !opened;
+      explBody.style.display = opened ? 'block' : 'none';
+      if (opened && !explBody.dataset.filled) {
+        explBody.dataset.filled = '1';
+        const notesHtml = ex.notes.map(n => `<div style="margin:4px 0;padding:6px 8px;border-radius:6px;${n.correct ? 'background:#ECFDF5;' : 'background:#F9FAFB;'}"><b style="color:${n.correct ? '#166534' : '#374151'};">${n.num}.</b> ${escapeHtml(n.note)}</div>`).join('');
+        explBody.innerHTML = `
+          <p style="font-weight:600;margin:6px 0 4px;">본문 해석</p>
+          <p style="color:#374151;white-space:pre-line;">${escapeHtml(ex.ko)}</p>
+          ${ex.walk ? `<p style="font-weight:600;margin:10px 0 4px;">생각의 흐름</p><p style="color:#374151;white-space:pre-line;">${escapeHtml(ex.walk)}</p>` : ''}
+          <p style="font-weight:600;margin:10px 0 4px;">선택지별 설명</p>
+          ${notesHtml}`;
+      }
+    };
+    explWrap.appendChild(explBtn); explWrap.appendChild(explBody);
+    card.appendChild(explWrap);
+  }
+  if (!correct) {
+    const askAiBtn = document.createElement('button');
+    askAiBtn.style.cssText = 'background:#F0FDF4;color:#166534;border:1px solid #BBF7D0;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;margin:4px 0 8px;';
+    askAiBtn.textContent = '🤖 AI에게 질문하기';
+    askAiBtn.onclick = () => openAiChatPanel(item.text, chosen, correctText, e.c);
+    card.appendChild(askAiBtn);
+  }
+  const next = document.createElement('button');
+  next.className = 'primary';
+  next.textContent = wnIdx + 1 < wnSession.length ? '다음 틀린 문제 →' : '결과 보기';
+  next.onclick = () => { wnIdx++; renderWrongNoteItem(); };
+  card.appendChild(next);
+  const quit = document.getElementById('wnQuitBtn');
+  if (quit) card.appendChild(quit); // 그만두기 단추를 맨 아래로
+}
+function renderWrongNoteSummary() {
+  const app = document.getElementById('app');
+  const left = wnLiveEntries().length;
+  const toList = wnBack !== renderWrongNote
+    ? `<button class="secondary" id="wnListBtn">📕 틀린 문제 목록 (${left}문항)</button>` : '';
+  app.innerHTML = `<div class="card" style="text-align:center;padding:26px 18px;">
+    <p style="font-size:16px;font-weight:700;margin:0 0 8px;">📕 틀린 문제 다시 풀기 끝</p>
+    <p style="font-size:15px;margin:0 0 4px;">${wnSession.length}문항 중 <b>${wnRight}개</b> 맞혔어요</p>
+    <p style="font-size:13px;color:#6B7280;margin:0 0 14px;">목록에 남은 틀린 문제: ${left}문항</p>
+    <button class="primary" id="wnDoneBackBtn">${wnEsc(wnBackLabel)}</button>
+    ${toList}
+    ${practiceNavHtml(null)}
+  </div>`;
+  document.getElementById('wnDoneBackBtn').onclick = () => wnBack();
+  const lb = document.getElementById('wnListBtn'); if (lb) lb.onclick = renderWrongNote;
+  bindPracticeNav(app);
 }
 
 // ===== 연습 분야 바로가기 (2026-11-05) =====
@@ -4757,6 +5036,7 @@ function renderTrainingItem() {
   const idx = [0,1,2,3,4].slice(0, trainPool[trainIdx].choices.length);
   for (let i = idx.length-1; i>0; i--) { const j=Math.floor(Math.random()*(i+1)); [idx[i],idx[j]]=[idx[j],idx[i]]; }
   const item = trainPool[trainIdx];
+  currentTrainItem = item;
   const shuffledChoices = idx.map(i => item.choices[i]);
   const shuffledAnswer = idx.indexOf(item.answer);
   const _explSrc = (item._ec && TYPE_EXPLAIN[item._ec] && TYPE_EXPLAIN[item._ec][item._el] && TYPE_EXPLAIN[item._ec][item._el][item._ei]) || null;
@@ -4815,6 +5095,7 @@ function renderTrainingItem() {
     toMenuBtn.textContent = '📋 유형 목록으로';
     toMenuBtn.onclick = renderTypeMenu;
     document.querySelector('.card').appendChild(toMenuBtn);
+    if (trainMode === 'practice') appendWrongNoteButton(document.querySelector('.card'), trainAxisKey);
   }
   if (trainMode === 'practice') {
     const _navCard = document.querySelector('.card');
@@ -4921,6 +5202,8 @@ async function sendAiChatMessage(questionText, studentAnswerText, correctText, u
 function selectTraining(correct, word, correctText, questionText, studentAnswerText) {
   if (correct) trainCorrect++;
   else logWrongAnswer(trainAxisKey, trainLevel, questionText, studentAnswerText, correctText, trainMode === 'test' ? '승급테스트' : '연습');
+  const _wnTake = !correct && !!studentName && currentTrainItem && currentTrainItem._ec != null;
+  if (_wnTake) addToWrongNote(currentTrainItem, studentAnswerText);
   logActivity(trainAxisKey, trainLevel, correct);
 
   // 유형(숫자 코드) 연습이면 세트 진행상태를 기록한다 (3축 훈련은 제외)
@@ -4946,6 +5229,12 @@ function selectTraining(correct, word, correctText, questionText, studentAnswerT
   const rootHtml = (!correct && word) ? renderRootCard(word) : '';
   fb.innerHTML = correct ? '정답입니다.' : `오답입니다.${correctText ? ` 정답: ${correctText}` : ''}${rootHtml}`;
   document.querySelector('.card').appendChild(fb);
+  if (_wnTake) {
+    const wnTip = document.createElement('p');
+    wnTip.style.cssText = 'font-size:12px;color:#991B1B;margin:6px 0 0;';
+    wnTip.textContent = '📕 이 문제는 「틀린 문제 다시 보기」에 담아 두었어요.';
+    document.querySelector('.card').appendChild(wnTip);
+  }
   if (lastTypeExplain) {
     const _ex = lastTypeExplain;
     const explWrap = document.createElement('div');
