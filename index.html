@@ -4318,7 +4318,7 @@ async function renderTypeMenu() {
       </button>
       <button id="wrongNoteBtn" style="display:block;width:100%;text-align:left;background:#FEF2F2;border:2px solid #FCA5A5;border-radius:10px;padding:11px 12px;margin-bottom:10px;cursor:pointer;">
         <span style="font-size:13.5px;font-weight:700;color:#991B1B;">📕 틀린 문제 다시 보기</span>
-        <span style="display:block;font-size:11.5px;color:#991B1B;margin-top:2px;">${wnCount ? `${wnCount}문항 모여 있어요 · 다시 풀어 맞히면 빠져요` : '번호별 연습에서 틀린 문제가 여기에 모여요'}</span>
+        <span id="wrongNoteCountText" style="display:block;font-size:11.5px;color:#991B1B;margin-top:2px;">${wnCount ? `${wnCount}문항 모여 있어요 · 다시 풀어 맞히면 빠져요` : '번호별 연습에서 틀린 문제가 여기에 모여요'}</span>
       </button>
       ${practiceNavHtml('type', ['my'])}
       <div style="height:12px;"></div>
@@ -4571,14 +4571,116 @@ function loadWrongNote() {
         if (p && typeof p === 'object') v = p;
       } catch (e) { /* 아직 담긴 문제가 없음 */ }
     }
-    if (wrongNoteOwner === owner) wrongNote = v;
+    if (wrongNoteOwner === owner) {
+      wrongNote = v;
+      if (studentName && GOOGLE_SHEET_WEBHOOK_URL) setTimeout(() => {
+        wnPullFromSheet().then(r => { if (r.changed) wnRefreshCounters(); if (r.ok && r.ahead) wnPushSoon(); }).catch(() => {});
+      }, 0);
+    }
     return v;
   })();
   return wrongNoteLoading;
 }
-function saveWrongNote() {
+function saveWrongNoteLocal() {
   if (!studentName || !wrongNote) return;
   try { appStorage.set(wrongNoteOwner, JSON.stringify(wrongNote), false).catch(() => {}); } catch (e) { /* 저장 실패해도 공부는 계속 */ }
+}
+function saveWrongNote() { if (!wrongNote) return; wnPrune(wrongNote); saveWrongNoteLocal(); wnPushSoon(); }
+
+// ── 구글 시트에도 함께 저장(다른 기기에서도 같은 목록) — 2026-11-05, 인계문서 453번 ──
+// 시트 「진행상태」 탭(이어하기 저장과 같은 곳)에 종류 'wrongnote'로 학생마다 한 줄. Apps Script는 고치지 않았다(종류를 가리지 않고 저장함).
+// 두 기기가 따로 바꿔도 합칠 수 있게 항목마다 마지막으로 바뀐 때(t)를 두고 더 늦은 쪽을 따른다.
+// 다시 풀어 맞힌 것은 지우지 않고 d:1로 표시만 남긴다(지우면 다른 기기 것과 합칠 때 되살아나므로). 60일 지나면 지운다.
+const WN_SHEET_KIND = 'wrongnote';
+const WN_LIVE_MAX = 300, WN_DONE_MAX = 200, WN_DONE_KEEP_DAYS = 60;
+const WN_SHEET_MAX_CHARS = 40000; // 시트 한 칸은 5만 자까지
+let wnPushTimer = null;
+function wnPrune(note) {
+  if (!note) return;
+  const old = Date.now() - WN_DONE_KEEP_DAYS * 864e5;
+  Object.keys(note).forEach(k => { const e = note[k]; if (!e || !e.c || (e.d && (e.t || 0) < old)) delete note[k]; });
+  const byAge = (a, b) => (note[a].t || 0) - (note[b].t || 0);
+  const live = Object.keys(note).filter(k => !note[k].d).sort(byAge);
+  const done = Object.keys(note).filter(k => note[k].d).sort(byAge);
+  if (live.length > WN_LIVE_MAX) live.slice(0, live.length - WN_LIVE_MAX).forEach(k => delete note[k]);
+  if (done.length > WN_DONE_MAX) done.slice(0, done.length - WN_DONE_MAX).forEach(k => delete note[k]);
+}
+function wnToSheetState() {
+  const all = Object.values(wrongNote || {}).filter(e => e && e.c).sort((a, b) => (b.t || 0) - (a.t || 0));
+  const rows = all.map(e => [e.c, e.l, e.i, e.h, e.n || 1, e.t || 0, e.d ? 1 : 0, e.d ? '' : String(e.my || '').slice(0, 60)]);
+  while (rows.length && JSON.stringify(rows).length > WN_SHEET_MAX_CHARS) {
+    let j = -1;
+    for (let x = rows.length - 1; x >= 0; x--) if (rows[x][6]) { j = x; break; }
+    rows.splice(j >= 0 ? j : rows.length - 1, 1); // 맞힌 표시 중 오래된 것부터, 없으면 오래된 문제부터
+  }
+  return { v: 1, e: rows };
+}
+function wnFromSheetState(st) {
+  const out = {};
+  if (!st || !Array.isArray(st.e)) return out;
+  st.e.forEach(a => {
+    if (!Array.isArray(a) || a.length < 6 || a[0] == null) return;
+    const e = { c: String(a[0]), l: String(a[1]), i: Number(a[2]) || 0, h: String(a[3] || ''), n: Number(a[4]) || 1, t: Number(a[5]) || 0, d: a[6] ? 1 : 0, my: String(a[7] || '') };
+    out[e.c + '|' + e.l + '|' + e.i] = e;
+  });
+  return out;
+}
+async function wnFetchSheet() {
+  if (!GOOGLE_SHEET_WEBHOOK_URL || !studentName) return { ok: false };
+  let timer = null;
+  try {
+    const ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    if (ctl) timer = setTimeout(() => ctl.abort(), 7000);
+    const res = await fetch(GOOGLE_SHEET_WEBHOOK_URL, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' }, signal: ctl ? ctl.signal : undefined,
+      body: JSON.stringify({ action: 'get_session_state', kind: WN_SHEET_KIND, name: studentName, school: studentSchool, grade: studentGrade, number: studentNumber })
+    });
+    const data = await res.json();
+    if (!data || data.status !== 'ok') return { ok: false };
+    let st = null;
+    try { st = data.stateJson ? JSON.parse(data.stateJson) : null; } catch (e) { st = null; }
+    return { ok: true, st };
+  } catch (e) { return { ok: false }; }
+  finally { if (timer) clearTimeout(timer); }
+}
+// 시트 것을 받아 이 기기 것과 합친다. ok: 시트에 닿음 · changed: 이 기기 것이 바뀜 · ahead: 이 기기에 시트보다 새것이 있음
+async function wnPullFromSheet() {
+  if (!studentName) return { ok: false, changed: false, ahead: false };
+  await loadWrongNote();
+  const owner = wrongNoteOwner;
+  const got = await wnFetchSheet();
+  if (!got.ok || owner !== wrongNoteOwner || !wrongNote) return { ok: false, changed: false, ahead: false };
+  const other = wnFromSheetState(got.st);
+  let changed = false;
+  Object.keys(other).forEach(k => {
+    const o = other[k], b = wrongNote[k];
+    if (!b || (o.t || 0) > (b.t || 0)) {
+      if (b && !o.d && !o.my && b.my) o.my = b.my;
+      wrongNote[k] = o; changed = true;
+    }
+  });
+  const ahead = Object.keys(wrongNote).some(k => !other[k] || (wrongNote[k].t || 0) > (other[k].t || 0));
+  if (changed) { wnPrune(wrongNote); saveWrongNoteLocal(); }
+  return { ok: true, changed, ahead };
+}
+function wnPushSoon() {
+  if (!studentName || !GOOGLE_SHEET_WEBHOOK_URL) return;
+  if (wnPushTimer) clearTimeout(wnPushTimer);
+  wnPushTimer = setTimeout(wnPushNow, 1500);
+}
+async function wnPushNow() {
+  wnPushTimer = null;
+  const got = await wnPullFromSheet(); // 그사이 다른 기기가 올린 것을 먼저 합친다
+  if (!got.ok || !wrongNote || !studentName) return; // 시트에 닿지 못하면 이번에는 올리지 않는다(다음에 바뀔 때 · 다음에 열 때 다시)
+  if (got.changed) wnRefreshCounters();
+  syncSessionStateToSheet(WN_SHEET_KIND, Object.assign({ studentName, studentSchool, studentGrade, studentNumber }, wnToSheetState()));
+}
+// 시트에서 새것을 받았을 때 화면의 문항 수를 고친다
+function wnRefreshCounters() {
+  const t = document.getElementById('wrongNoteCountText');
+  if (t) { const n = wnLiveEntries().length; t.textContent = n ? `${n}문항 모여 있어요 · 다시 풀어 맞히면 빠져요` : '번호별 연습에서 틀린 문제가 여기에 모여요'; }
+  const b = document.getElementById('wrongNoteHereBtn');
+  if (b && b.dataset.code) { const n = wnLiveEntries(b.dataset.code).length; b.textContent = n ? `📕 이 번호 틀린 문제 다시 보기 (${n}문항)` : '📕 이 번호 틀린 문제 다시 보기 (아직 없어요)'; }
 }
 async function addToWrongNote(trainItem, myAnswer) {
   if (!studentName || !trainItem || trainItem._ec == null) return;
@@ -4590,11 +4692,7 @@ async function addToWrongNote(trainItem, myAnswer) {
   const h = wnHash(bankItem);
   const prev = note[k];
   note[k] = { c: String(trainItem._ec), l: String(trainItem._el), i: trainItem._ei, h: h,
-              n: (prev && prev.h === h ? (prev.n || 0) : 0) + 1, t: Date.now(), my: String(myAnswer || '').slice(0, 200) };
-  const keys = Object.keys(note);
-  if (keys.length > WRONG_NOTE_MAX) {
-    keys.sort((a, b) => (note[a].t || 0) - (note[b].t || 0)).slice(0, keys.length - WRONG_NOTE_MAX).forEach(x => delete note[x]);
-  }
+              n: (prev && prev.h === h ? (prev.n || 0) : 0) + 1, t: Date.now(), my: String(myAnswer || '').slice(0, 200), d: 0 };
   saveWrongNote();
 }
 // 담아 둔 문제를 지금 문제 은행에서 찾는다(자리가 옮겨졌으면 같은 칸에서 다시 찾고, 고쳐져서 없으면 null)
@@ -4608,14 +4706,21 @@ function wnResolve(e) {
 function wnLiveEntries(code) {
   const note = wrongNote || {};
   let changed = false;
-  const out = [];
+  const out = [], seen = new Set(), now = Date.now();
+  const take = (key) => { const ent = note[key]; if (!ent || ent.d || seen.has(key)) return; seen.add(key); if (!code || ent.c === code) out.push(ent); };
   Object.keys(note).forEach(k => {
     const e = note[k];
     if (!e || !e.c) { delete note[k]; changed = true; return; }
+    if (e.d) return; // 다시 풀어 맞힌 것(다른 기기에 알리려고 표시만 남겨 둠)
     const r = wnResolve(e);
-    if (!r) { delete note[k]; changed = true; return; }
-    if (r.i !== e.i) { delete note[k]; e.i = r.i; note[e.c + '|' + e.l + '|' + r.i] = e; changed = true; }
-    if (!code || e.c === code) out.push(e);
+    if (!r) { note[k] = Object.assign({}, e, { d: 1, t: now }); changed = true; return; } // 문제가 고쳐져 더는 없음
+    if (r.i !== e.i) { // 같은 칸 안에서 자리만 옮겨짐
+      const nk = e.c + '|' + e.l + '|' + r.i, cur = note[nk];
+      note[k] = Object.assign({}, e, { d: 1, t: now });
+      if (!cur || (cur.t || 0) < (e.t || 0)) note[nk] = Object.assign({}, e, { i: r.i });
+      changed = true; take(nk); return;
+    }
+    take(k);
   });
   if (changed) saveWrongNote();
   return out.sort((a, b) => (b.t || 0) - (a.t || 0));
@@ -4627,6 +4732,7 @@ function appendWrongNoteButton(container, code) {
   const b = document.createElement('button');
   b.className = 'secondary';
   b.id = 'wrongNoteHereBtn';
+  b.dataset.code = code;
   b.style.cssText = 'margin-top:6px;border-color:#FCA5A5;color:#991B1B;';
   b.textContent = '📕 이 번호 틀린 문제 다시 보기';
   container.appendChild(b);
@@ -4648,6 +4754,7 @@ async function renderWrongNote() {
   const app = document.getElementById('app');
   app.innerHTML = `<div class="card"><p style="font-size:13px;color:#6B7280;">틀린 문제를 불러오는 중...</p></div>`;
   await loadWrongNote();
+  try { const r = await wnPullFromSheet(); if (r.ok && r.ahead) wnPushSoon(); } catch (e) { /* 시트에 닿지 못하면 이 기기 것만 */ }
   const list = wnLiveEntries();
   const groups = {};
   list.forEach(e => { const g = e.c + '|' + e.l; (groups[g] = groups[g] || []).push(e); });
@@ -4672,7 +4779,7 @@ async function renderWrongNote() {
     <p style="font-size:12.5px;color:#6B7280;line-height:1.6;margin:0 0 12px;">번호별 연습과 승급테스트에서 틀린 문제를 모아 두었어요. 다시 풀어 맞히면 목록에서 빠지고, 또 틀리면 남아요.</p>
     ${body}
     ${studentName ? '' : '<p style="font-size:12px;color:#B45309;margin:10px 0 0;">이름을 넣고 시작해야 틀린 문제가 모입니다.</p>'}
-    <p style="font-size:11.5px;color:#9CA3AF;margin:10px 0 0;">이 기기(이 브라우저)에 저장됩니다. 다른 폰 · 컴퓨터에서는 따로 모입니다.</p>
+    <p style="font-size:11.5px;color:#9CA3AF;margin:10px 0 0;">이 기기와 구글 시트에 함께 저장돼요. 다른 폰 · 컴퓨터에서도 이름 · 학교 · 학년 · 반 · 번호를 똑같이 넣으면 같은 목록이 보여요.</p>
     ${practiceNavHtml(null, ['type'])}
     <button class="secondary" id="wnBackBtn">📋 번호별 목록으로</button>
   </div>`;
@@ -4737,8 +4844,8 @@ function selectWrongNoteAnswer(e, item, correct, chosen, correctText, ex) {
   const k = e.c + '|' + e.l + '|' + e.i;
   if (correct) wnRight++;
   if (wrongNote) {
-    if (correct) delete wrongNote[k];
-    else { const cur = wrongNote[k] || e; cur.n = (cur.n || 0) + 1; cur.t = Date.now(); cur.my = String(chosen || '').slice(0, 200); wrongNote[k] = cur; }
+    if (correct) wrongNote[k] = Object.assign({}, wrongNote[k] || e, { d: 1, t: Date.now() });
+    else { const cur = wrongNote[k] || e; cur.n = (cur.n || 0) + 1; cur.t = Date.now(); cur.d = 0; cur.my = String(chosen || '').slice(0, 200); wrongNote[k] = cur; }
     saveWrongNote();
   }
   try { logActivity(e.c, Number(e.l), correct); } catch (x) { /* 기록 실패해도 계속 */ }
