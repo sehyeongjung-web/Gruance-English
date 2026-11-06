@@ -304,7 +304,11 @@ function refreshTrainItem(it) {
   return null;
 }
 
+// 보기 글자: 「①」처럼 동그라미 숫자 하나뿐인 보기(삽입 문항)는 앞에 「1.」을 붙이지 않는다(474번).
+function choiceLabel(c, i) { return /^[①②③④⑤]$/.test(String(c).trim()) ? String(c).trim() : `${i+1}. ${c}`; }
 function shuffleSingle(q) {
+  // 순서 · 삽입처럼 보기 차례가 정해진 문항("fixed": true)은 섞지 않는다(474번).
+  if (q && q.fixed) return {text:q.text, choices: q.choices.slice(), answer: Number.isInteger(q.answer) ? q.answer : 0};
   const idx = q.choices.map((_,i)=>i);
   for (let i=idx.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [idx[i],idx[j]]=[idx[j],idx[i]]; }
   // 저장된 정답 번호(q.answer)를 따라간다. answer가 없으면 첫 선택지를 정답으로 본다.
@@ -3017,7 +3021,7 @@ function renderDiagScreen() {
       const wrap = document.getElementById('choices');
       q.choices.forEach((c,i)=>{
         const btn=document.createElement('button');
-        btn.className='choice'; btn.textContent=`${i+1}. ${c}`;
+        btn.className='choice'; btn.textContent=choiceLabel(c, i);
         btn.onclick=()=>answerSingleFirst(i===q.answer);
         wrap.appendChild(btn);
       });
@@ -3057,7 +3061,7 @@ function renderDiagScreen() {
       const wrap = document.getElementById('choices');
       cq.choices.forEach((c,i)=>{
         const btn=document.createElement('button');
-        btn.className='choice'; btn.textContent=`${i+1}. ${c}`;
+        btn.className='choice'; btn.textContent=choiceLabel(c, i);
         btn.onclick=()=>selectConfirm(i===cq.answer);
         wrap.appendChild(btn);
       });
@@ -4561,8 +4565,11 @@ function buildTrainPool(axisKey, level) {
   } else if (axisKey === 'reason' || axisKey === 'syntax') {
     const bank = axisKey === 'reason' ? REASON_BANK : SYNTAX_BANK;
     const confirmBank = axisKey === 'reason' ? REASON_CONFIRM : SYNTAX_CONFIRM;
-    if (bank[level]) pool.push({ text: bank[level].text, q: '', choices: bank[level].choices, answer: bank[level].answer });
-    (confirmBank[level] || []).forEach(item => pool.push({ text: item.text, q: '', choices: item.choices, answer: item.answer }));
+    // 첫 문제 은행은 레벨마다 배열이다(예전에는 한 문항이라 bank[level].text로 읽다가 빈 문항이 섞여 연습 화면이 멈췄음, 474번).
+    const firsts = Array.isArray(bank[level]) ? bank[level] : (bank[level] ? [bank[level]] : []);
+    firsts.concat(confirmBank[level] || []).forEach(item => {
+      if (_validQuestion(item)) pool.push({ text: item.text, q: '', choices: item.choices, answer: item.answer, fixed: !!item.fixed });
+    });
   } else if (TYPE_BANK[axisKey]) {
     // 유형별 훈련: TYPE_BANK[코드][레벨]은 배열(현재는 1개씩, 향후 확장 가능)
     (TYPE_BANK[axisKey][String(level)] || []).forEach((item, i) => {
@@ -5194,7 +5201,7 @@ function renderTrainingItem() {
     return;
   }
   const idx = [0,1,2,3,4].slice(0, trainPool[trainIdx].choices.length);
-  for (let i = idx.length-1; i>0; i--) { const j=Math.floor(Math.random()*(i+1)); [idx[i],idx[j]]=[idx[j],idx[i]]; }
+  if (!trainPool[trainIdx].fixed) for (let i = idx.length-1; i>0; i--) { const j=Math.floor(Math.random()*(i+1)); [idx[i],idx[j]]=[idx[j],idx[i]]; } // 차례 고정 문항은 섞지 않음(474번)
   const item = trainPool[trainIdx];
   currentTrainItem = item;
   const shuffledChoices = idx.map(i => item.choices[i]);
@@ -5236,7 +5243,7 @@ function renderTrainingItem() {
   const wrap = document.getElementById('choices');
   shuffledChoices.forEach((c,i)=>{
     const btn=document.createElement('button');
-    btn.className='choice'; btn.textContent=`${i+1}. ${c}`;
+    btn.className='choice'; btn.textContent=choiceLabel(c, i);
     btn.onclick=()=>{ stopSpeaking(); selectTraining(i===shuffledAnswer, item.word, item.correctWord || shuffledChoices[shuffledAnswer], item.text, shuffledChoices[i]); };
     wrap.appendChild(btn);
   });
