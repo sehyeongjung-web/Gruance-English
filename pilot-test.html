@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>그루앙스 시범 풀이 — 15분 20문제</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; background:#F4F1EA; color:#1F2937; font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif; }
+  .wrap { max-width:720px; margin:0 auto; padding:20px 16px 60px; }
+  h1 { font-size:18px; color:#16324F; margin:0 0 4px; }
+  p.sub { font-size:12.5px; color:#6B7280; margin:0 0 16px; line-height:1.55; }
+  .card { background:#fff; border-radius:14px; padding:18px; box-shadow:0 1px 3px rgba(0,0,0,0.08); margin-bottom:14px; }
+  .badge { display:inline-block; font-size:11.5px; font-weight:700; padding:3px 10px; border-radius:999px; margin-right:6px; background:#E8F1EE; color:#0F6E56; }
+  button { font-family:inherit; }
+  button.primary { width:100%; padding:13px; border:none; border-radius:12px; background:#16324F; color:#fff; font-weight:600; margin-top:14px; cursor:pointer; font-size:14px; }
+  button.primary:disabled { background:#9CA3AF; cursor:default; }
+  .secondary { display:block; text-align:center; text-decoration:none; width:100%; padding:11px; border:1px solid #16324F; border-radius:12px; background:#fff; color:#16324F; font-weight:600; margin-top:10px; cursor:pointer; font-size:14px; }
+  .passage { font-family:Georgia,"Noto Serif KR",serif; font-size:15.5px; line-height:1.85; background:#FBFAF7; border-radius:10px; padding:14px; margin:10px 0 12px; white-space:pre-wrap; }
+  .choice { display:block; width:100%; text-align:left; padding:11px 12px; margin-top:8px; border:1.5px solid #D1D5DB; border-radius:10px; background:#fff; font-size:14.5px; line-height:1.6; cursor:pointer; color:#1F2937; }
+  .choice.on { border-color:#16324F; background:#EEF3F9; font-weight:600; }
+  .bar { height:8px; background:#E5E7EB; border-radius:6px; overflow:hidden; margin:8px 0 2px; }
+  .bar > div { height:100%; background:#0F6E56; }
+  table { border-collapse:collapse; width:100%; font-size:12.5px; }
+  th, td { border-bottom:1px solid #E5E7EB; padding:5px 6px; text-align:left; vertical-align:top; }
+  th { background:#F3F4F6; font-weight:700; }
+  button:focus-visible, input:focus-visible, a:focus-visible { outline:2px solid #2563EB; outline-offset:2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div style="display:flex; align-items:center; gap:8px; margin:0 0 6px;">
+    <svg width="19" height="16" viewBox="0 0 140 116" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="flex:none;">
+      <path d="M23 0 h37 v48 h-37 v20 h37 v48 h-37 a23 23 0 0 1 -23 -23 v-70 a23 23 0 0 1 23 -23 z" fill="#0F6E56"/>
+      <path d="M117 0 h-37 v48 h37 v20 h-37 v48 h37 a23 23 0 0 0 23 -23 v-70 a23 23 0 0 0 -23 -23 z" fill="#E8752A"/>
+    </svg>
+    <span style="font-size:12px; font-weight:700; letter-spacing:1.3px;"><span style="color:#0F6E56">G</span><span style="color:#3DA88C">RU</span><span style="color:#E8752A">ANCE</span></span>
+  </div>
+  <h1>시범 풀이 — 15분 20문제</h1>
+  <p class="sub">이 풀이는 점수나 레벨에 들어가지 않습니다. 문제가 알맞게 어려운지 보려는 것이니, 아는 만큼 편하게 푸세요.</p>
+  <div id="app"></div>
+  <footer style="text-align:center;padding:16px 0 8px;margin-top:10px;">
+    <p style="font-size:11px;color:#9CA3AF;letter-spacing:0.3px;">그루앙스 AI 수능영어코치 · 시범 풀이 · ⓒ 정세형. 무단 복제 및 배포를 금지합니다.</p>
+  </footer>
+</div>
+<script>
+// ===== 시범 풀이 페이지 (pilot-test.html, 2026-11-09) =====
+// 목적: 레벨 2~6(추론축) 문항을 레벨을 가리고 섞어 한 반이 15분에 풀어 보고, 문제마다 정답률이 레벨 순서대로 나오는지 본다.
+// 앱(index.html)의 레벨 기록 · 활동로그 · 진단결과에는 쓰지 않는다. 기록은 이 기기와 구글 시트 「진행상태」 탭의 종류 pilot 한 줄(학생마다)뿐이다.
+// 학생 정보는 여백 노트와 같이, 앱에서 접속 코드를 넣은 기기의 학생 정보를 읽어 쓴다. 선생님 화면: 이 주소 + ?admin=grouance-teacher-key#teacher
+const ITEMS = [{"id": "L2C1", "lv": 2, "k": "빈칸", "text": "다음 글의 빈칸에 들어갈 말로 가장 적절한 것은?\n\n우리 학교 방송부는 아침 등교 시간마다 노래를 한 곡씩 틀어 준다. 예전에는 방송부원들이 그날 틀 노래를 직접 골랐다. 지난달부터는 학생들이 쪽지에 적어 낸 신청곡 가운데에서 뽑아 틀고 있다. 그 뒤로 아침 방송에 귀를 기울이는 학생이 부쩍 늘었다. 학생들이 방송을 더 챙겨 듣게 된 것은 ________ 때문이다.", "choices": ["방송부원들이 전보다 더 좋은 노래를 골라 주었기", "자기들이 듣고 싶다던 노래가 나오게 되었기", "아침마다 노래를 빠짐없이 한 곡씩 틀어 주었기", "노래를 하루에 한 곡에서 두 곡으로 늘려 틀었기", "방송을 점심시간으로 옮겨서 틀게 되었기"], "answer": 1, "fixed": false}, {"id": "L2F1", "lv": 2, "k": "빈칸", "text": "다음 글의 빈칸에 들어갈 말로 가장 적절한 것은?\n\n우리 사진 동아리는 학년말마다 복도에 사진을 걸어 작은 전시회를 연다. 사진 밑에는 찍은 사람의 이름표를 붙인다. 작년에는 학생들이 사진 앞을 그냥 스쳐 지나가곤 했다. 올해는 사진마다 ________ 종이를 한 장씩 곁에 붙였다. 종이에는 그 장면을 왜 찍게 되었는지가 두세 줄씩 적혀 있었다.", "choices": ["그 순간을 고른 사연을 담은", "사진을 찍은 날짜와 장소를 적은", "찍은 사람이 누구인지 알려 주는", "보는 사람이 느낀 점을 써 넣는", "사진을 잘 찍는 요령을 알려 주는"], "answer": 0, "fixed": false}, {"id": "L2C9", "lv": 2, "k": "빈칸", "text": "다음 글의 빈칸에 들어갈 말로 가장 적절한 것은?\n\n지난달 우리 반에 서윤이가 전학을 왔다. 다음 주 과학 발표에서 우리 모둠은 글은 나와 태민이가, 발표는 하은이가 맡기로 했다. 서윤이는 전에 다니던 학교에서 만화 동아리 부장이었다고 했다. 그 말을 듣고 우리는 발표 자료에 들어갈 그림을 서윤이에게 부탁했다. 서윤이에게 그림을 부탁한 것은 ________ 때문이다.", "choices": ["서윤이가 지난달 우리 반으로 전학을 왔기", "글을 쓸 사람이 모둠에 따로 없었기", "서윤이가 미술 대회에서 상을 받은 적이 있었기", "서윤이가 예전 학교에서 만화반 대표였기", "서윤이가 공책 정리를 예쁘게 잘했기"], "answer": 3, "fixed": false}, {"id": "L2C5", "lv": 2, "k": "요지", "text": "다음 글의 요지로 가장 적절한 것은?\n\n이번 학기 우리 반 반장 선거에는 두 명이 후보로 나섰다. 지우는 공약을 열 가지나 내놓아 연설 때 박수를 더 많이 받았다. 민호는 공약을 두 가지만 말했지만 언제까지 어떻게 하겠다는 것까지 밝혔다. 투표에서는 민호가 더 많은 표를 얻었다. 친구들은 민호의 약속이라면 정말 지켜질 것 같았다고 말했다.", "choices": ["공약을 많이 내놓은 후보가 연설 때 박수를 많이 받는다", "연설 때 박수를 많이 받은 후보가 반장으로 뽑힌다", "친구들은 해낼 만한 약속을 한 후보를 뽑는다", "친구들은 공약보다 후보의 말솜씨를 보고 표를 준다", "반장으로는 평소 친구들과 두루 친한 후보가 뽑힌다"], "answer": 2, "fixed": false}, {"id": "L3C12", "lv": 3, "k": "빈칸", "text": "다음 글의 빈칸에 들어갈 말로 가장 적절한 것은?\n\n골목 목욕탕 주인은 손님을 늘리려고 목욕탕 바로 옆 주차장을 무료로 바꾸었다. 전에는 주차비가 아까워 하루 종일 차를 세워 두는 사람이 거의 없었다. 이 주차장에는 차를 열 대밖에 세울 수 없다. 그런데 무료가 되자 근처 회사에 다니는 사람들이 아침 일찍 차를 세워 열 자리를 다 채우고, 저녁에야 빼 갔다. 그 뒤로 낮에 차를 몰고 목욕하러 온 손님들은 ________.", "choices": ["목욕을 마치고 나면 주차비를 따로 내야 했다", "차 댈 곳이 없어 되돌아가는 일이 잦았다", "저녁이 되어서야 차를 빼 갈 수 있었다", "주차비를 아낀 만큼 목욕탕에 더 자주 왔다", "목욕탕이 붐벼 탈의실에서 오래 기다렸다"], "answer": 1, "fixed": false}, {"id": "L3C1", "lv": 3, "k": "빈칸", "text": "다음 글의 빈칸에 들어갈 말로 가장 적절한 것은?\n\n구립 도서관은 책을 늦게 돌려주는 사람이 많아 고민이었다. 빌리는 기간을 두 주에서 세 주로 늘려 보았지만, 늦는 책은 줄지 않았다. 알고 보니 늦는 사람은 대개 도서관이 문을 닫은 밤늦게 지하철에서 내려 집으로 가는 직장인이었다. 그래서 도서관은 여는 시간은 그대로 두고, 역 출구 옆에 반납함을 하나 놓았다. 그 뒤로 늦는 책이 크게 줄어든 것은 ________.", "choices": ["책을 빌려 가는 기간이 전보다 길어져서이다", "역 안에 책을 빌려주는 창구를 새로 열어서이다", "도서관 문 앞에 반납함을 새로 놓아서이다", "도서관이 밤늦게까지 문을 열게 되어서이다", "퇴근길에 들러 책을 넣고 갈 곳이 생겨서이다"], "answer": 4, "fixed": false}, {"id": "L3C8", "lv": 3, "k": "빈칸", "text": "다음 글의 빈칸에 들어갈 말로 가장 적절한 것은?\n\n길모퉁이 사진관 아저씨는 가족사진을 찍을 때 '하나, 둘, 셋!' 하고 셋에 맞춰 단추를 눌렀다. 그런데 사진마다 눈 감은 얼굴이 꼭 한두 사람씩 나왔고, 번쩍이는 불을 끄고 찍어도 마찬가지였다. 알고 보니 꽤 많은 사람이 몇까지 세든 마지막 숫자를 듣는 바로 그 순간에 눈을 깜빡였다. 깜빡인 눈은 곧 다시 떠져, 그 뒤 잠깐은 모두 눈을 뜬 채 사진기를 바라보았다. 그래서 아저씨는 이제 ________.", "choices": ["불을 끄고 창가의 햇빛으로 찍는다", "셋 대신 다섯까지 세고 다섯에 맞춰 누른다", "셋을 외치는 바로 그 순간에 맞춰 단추를 누른다", "숫자를 다 세고 한 박자 쉬었다가 찍는다", "가족들에게 웃는 얼굴로 사진기를 보라고 이른다"], "answer": 3, "fixed": false}, {"id": "L3C4", "lv": 3, "k": "요지", "text": "다음 글의 요지로 가장 적절한 것은?\n\n큰길에 있는 세탁소 두 곳은 솜씨도 값도 비슷하다. 둘 다 맡은 옷을 사흘 뒤에 내주고, 내줄 때는 손님 앞에서 비닐을 벗겨 함께 살펴본다. 그런데 손님이 '맡길 때는 없던 얼룩이 생겼다'며 다투는 일은 한 곳에서만 자주 일어난다. 다른 한 곳은 옷을 받을 때 손님과 함께 얼룩이나 해진 데를 살펴보고 쪽지에 적어 둔다. 그래서 그곳에서는 손님이 얼룩 이야기를 꺼내도 쪽지를 같이 보면 금방 풀린다.", "choices": ["세탁소 다툼은 대개 옷을 늦게 돌려주는 데서 비롯된다", "세탁소는 다 된 옷을 내줄 때 손님과 함께 살펴야 다툼이 적다", "세탁소는 옷을 받을 때 손님과 함께 살펴 두어야 다툼이 적다", "세탁소는 값을 조금 낮추어야 손님과 다툴 일이 줄어든다", "세탁소 다툼은 대개 맡긴 옷이 남의 옷과 뒤바뀌는 데서 생긴다"], "answer": 2, "fixed": false}, {"id": "L4C1", "lv": 4, "k": "빈칸", "text": "다음 글의 빈칸에 들어갈 말로 가장 적절한 것은?\n\n아빠와 함께 간 캠핑장에는 개수대가 다섯 곳 있었는데, 저녁이면 맨 끝 한 곳만 늘 비어 있었다. 그 개수대도 다른 곳과 크기가 같고 물도 잘 나와서, 낮에는 사람들이 줄을 서서 썼다. 다섯 곳 모두 밤늦게까지 쓸 수 있었다. 개수대마다 위에 등이 하나씩 달려 있었지만, 맨 끝 개수대 위의 등은 고장 나 있었다. 해가 지고 나면 사람들은 그릇을 들고 나머지 네 곳 앞에 길게 줄을 섰다. 저녁에 사람들이 맨 끝 개수대를 쓰지 않은 것은 ________.", "choices": ["그 개수대만 물이 시원하게 나오지 않아서이다", "낮에도 사람들이 꺼리던 자리여서이다", "해가 지면 그 자리만 어둑어둑해져서이다", "해 질 무렵 관리인이 그 개수대를 잠가 두어서이다", "다른 개수대보다 좁아 그릇 놓을 데가 없어서이다"], "answer": 2, "fixed": false}, {"id": "L4F1", "lv": 4, "k": "빈칸", "text": "다음 글의 빈칸에 들어갈 말로 가장 적절한 것은?\n\n바닷가 마을에 나란히 선 민박집 두 곳은 방 크기도 값도 같고, 바다까지 걷는 거리도 같다. 그런데 비 예보가 나오면 '파도민박'에는 예약을 물리는 손님이 줄을 잇고, '갈매기민박'에는 거의 없다. 두 집 모두 비 오는 날이라고 값을 깎아 주지는 않고, 예약을 물리는 손님에게는 돈을 모두 돌려준다. 파도민박은 마당이 넓지만 지붕이 없어, 비가 오면 손님들이 방 안에만 머문다. 갈매기민박은 마당에 지붕을 씌운 평상을 두어, 손님들이 그 아래에서 고기를 구워 먹으며 빗소리를 듣는다. 비 예보에도 갈매기민박 손님들이 예약을 물리지 않는 것은 ________.", "choices": ["예약을 물리면 낸 돈을 돌려받지 못해서이다", "마당이 넓어 여럿이 어울릴 수 있어서이다", "비 오는 날에는 방값을 깎아 주어서이다", "비가 와도 방 밖에서 즐길 거리가 있어서이다", "파도민박보다 바다에 더 가까이 있어서이다"], "answer": 3, "fixed": false}, {"id": "L4C9", "lv": 4, "k": "빈칸", "text": "다음 글의 빈칸에 들어갈 말로 가장 적절한 것은?\n\n우리 마을은 해마다 설 다음 날 회관에서 떡국 잔치를 연다. 부녀회는 올해도 지난해처럼 떡국 이백 그릇을 끓였는데, 절반 가까이가 남았다. 떡국은 지난해와 같은 분들이 끓였고, 잔치에 온 사람 수도 비슷했다. 다만 올해는 회관 사정으로 잔치를 낮 열두 시가 아니라 오후 세 시에 열었다. 사람들은 맛은 예년 그대로라면서도 몇 숟가락 뜨다 말고 수정과를 마시며 이야기를 나누었다. 올해 떡국이 지난해와 달리 많이 남은 것은 ________.", "choices": ["다들 점심을 먹고 와 배가 불렀기 때문이다", "올해는 떡국 맛이 지난해만 못했기 때문이다", "부녀회가 지난해처럼 이백 그릇을 끓였기 때문이다", "잔치에 온 사람이 지난해의 절반뿐이었기 때문이다", "떡국을 끓인 사람들이 지난해와 달랐기 때문이다"], "answer": 0, "fixed": false}, {"id": "L4F3", "lv": 4, "k": "요지", "text": "다음 글의 요지로 가장 적절한 것은?\n\n할머니와 엄마는 같은 날 같은 가게에서 산 미역과 소고기로 미역국을 끓이셨다. 엄마는 냄비에 물부터 붓고, 물이 끓으면 미역과 고기를 넣어 한 시간 넘게 푹 끓이셨다. 할머니는 미역과 고기를 참기름에 십 분쯤 달달 볶은 다음 물을 부으셨고, 끓이는 시간은 엄마보다 삼십 분 짧았다. 볶는 동안에는 미역이 바닥에 눌어붙지 않게 쉬지 않고 저으셨다. 식구들은 모두 할머니의 국이 더 진하고 구수하다고 했다.", "choices": ["미역국은 냄비에 오래 푹 끓일수록 국물 맛이 깊고 진해진다", "미역국은 건더기를 기름에 익힌 뒤 물을 부어야 맛이 깊다", "미역국 맛은 어느 가게에서 산 미역을 쓰는지에 달려 있다", "미역국은 고기를 넣지 않아야 국물이 깔끔하고 진하다", "미역국 미역은 볶을 때 바닥에 눌어붙지 않게 저어 주어야 한다"], "answer": 1, "fixed": false}, {"id": "L5C3", "lv": 5, "k": "빈칸", "text": "다음 글의 빈칸에 들어갈 말로 가장 적절한 것은?\n\n우리 학교 방송부는 점심시간마다 고민 사연과 칭찬 사연을 모두 받아 읽어 준다. 예전에는 사연함이 3층 끝 방송실 문 옆에 하나뿐이었다. 카드에 이름을 쓰지 않아도 되는 것은 예나 지금이나 같다. 올봄 방송부는 사연을 더 많이 받으려고 반마다 교탁 옆에 작은 사연함을 하나씩 걸었다. 그 뒤로 칭찬 사연은 두 배로 늘었지만, 들어오는 고민 사연은 한 주에 열 장 남짓에서 한두 장으로 줄었다. 쉬는 시간에도 교탁 둘레에는 늘 반 아이들이 모여 있어서, 카드를 넣으러 가면 누구 눈에나 띄었다. 고민 사연이 줄어든 것은 ________.", "choices": ["카드를 넣는 모습이 반 아이들에게 그대로 드러나서이다", "3층 방송실까지 카드를 들고 가기가 번거로워서이다", "카드에 이름이 남아 속마음을 털어놓기가 꺼려져서이다", "칭찬 사연을 읽느라 고민 사연을 읽어 줄 틈이 줄었기 때문이다", "방송부가 고민 사연은 받지 않기로 규칙을 바꾸었기 때문이다"], "answer": 0, "fixed": false}, {"id": "L5C8", "lv": 5, "k": "빈칸", "text": "다음 글의 빈칸에 들어갈 말로 가장 적절한 것은?\n\n섬 일주 관광을 안내하는 이모는 손님들을 배에 태우기 전에 섬 관리소의 깃발부터 확인한다. 노란 깃발은 바람이 센 날 올리는데, 그날에도 배는 그대로 다니고 벼랑 위 등대 길만 막힌다. 등대 길이 막힌 날이면 이모는 손님들을 바닷가 동굴 길로 데려간다. 동굴 길은 바닷물이 빠지는 낮 한 시부터 세 시 사이에만 걸을 수 있다. 오늘 아침 관리소 깃대에는 노란 깃발이 올라 있었고, 손님들을 태운 배는 낮 한 시 반에 섬에 닿는다. 그렇다면 오늘 이모와 손님들은 ________.", "choices": ["물이 빠진 바닷가 동굴 길을 걸으며 구경하게 될 것이다", "센 바람에 배가 뜨지 못해 항구에서 발이 묶일 것이다", "벼랑 위 등대까지 이어진 길을 따라 섬을 돌 것이다", "동굴 길이 열리기를 한 시간 넘게 기다리게 될 것이다", "노란 깃발이 내려갈 때까지 관리소 앞에 머물 것이다"], "answer": 0, "fixed": false}, {"id": "L5C10", "lv": 5, "k": "빈칸", "text": "다음 글의 빈칸에 들어갈 말로 가장 적절한 것은?\n\n골목 정비소 최 사장님은 부품을 갈면 떼어 낸 헌 부품을 날짜를 적은 쪽지와 함께 비닐봉지에 담아 손님 차 조수석에 놓아 둔다. 동네 사람들은 새것으로 갈았다는 것을 보여 주려고 그런다고들 하지만, 손님은 부품을 가는 내내 정비실에서 다 지켜본다. 이 정비소에는 차마다 무엇을 갈았는지 적어 두는 장부가 따로 없어서, 단골들은 다음에 차를 맡길 때 지난번 봉지의 쪽지를 챙겨 와 사장님께 건넨다. 사장님이 헌 부품을 봉지에 담아 두는 것은 ________.", "choices": ["새 부품으로 제대로 갈았음을 보여 주려는 것이다", "날짜를 정비소 장부에 옮겨 적으려는 것이다", "헌 부품을 손질해 다시 팔려고 모아 두는 것이다", "손님이 정비실 안을 들여다보지 못하게 하려는 것이다", "무엇을 언제 갈았는지 손님 쪽에 남겨 두려는 것이다"], "answer": 4, "fixed": false}, {"id": "L5C6", "lv": 5, "k": "요지", "text": "다음 글의 요지로 가장 적절한 것은?\n\n우리 학교 방과 후 강좌 가운데 해마다 신청자가 가장 많은 것은 목공 교실이었고, 다들 만들기가 재미있어서라고 했다. 우리 학교 학생 가운데 절반이 넘는 학생이 오후 다섯 시에 떠나는 마지막 통학 버스를 타고 집에 간다. 목공 교실은 늘 버스 시간 전에 끝났는데, 올해는 공구실 공사로 같은 선생님의 같은 수업이 버스가 떠난 뒤에야 끝나게 되었다. 그러자 신청자가 서른 명에서 열두 명으로 줄었다. 반면 네 시에 끝나 버스를 한 시간이나 기다려야 하던 한자 교실은 해마다 자리가 남았는데, 목공 교실이 쓰던 시간으로 옮겨 오자 처음으로 자리가 다 찼다.", "choices": ["방과 후 강좌는 학생들이 재미를 느낄 만한 것이어야 사람이 모인다", "방과 후 강좌는 이름난 선생님이 맡아야 신청하는 학생이 늘어난다", "방과 후 강좌는 끝나는 시각이 이를수록 신청하는 학생이 많아진다", "방과 후 강좌는 집에 가는 차 시간에 맞추어 끝나야 사람이 모인다", "방과 후 강좌는 한자처럼 공부에 도움이 되어야 인기를 얻는다"], "answer": 3, "fixed": false}, {"id": "L6C7", "lv": 6, "k": "순서", "text": "주어진 글 다음에 이어질 글의 순서로 가장 적절한 것은?\n\n아프리카 초원의 아카시아 나무에는 손가락만 한 가시가 돋아 있다. 그런데 한 그루를 땅에서부터 꼭대기까지 훑어보면, 가시가 나무 전체에 고르게 나 있지는 않다.\n\n(A) 가시를 만드는 데에도 양분이 든다. 그러니 기린의 입조차 닿지 않는 높이에까지 긴 가시를 두르는 것은 나무에게 헛된 씀씀이다. 나무는 잎을 뜯길 걱정이 있는 높이에만 가시를 넉넉히 두는 것으로 보인다.\n\n(B) 땅에서 기린의 머리가 닿는 높이까지의 가지에는 가시가 길고 촘촘하다. 그러나 그보다 높은 가지로 올라가면 가시는 눈에 띄게 짧아지고 드문드문해진다.\n\n(C) 이 풀이는 한 실험으로 뒷받침되었다. 나무 둘레에 울타리를 쳐 큰 초식 동물이 다가오지 못하게 하자, 몇 해 뒤 그 나무들은 아래쪽 가지에도 가시가 짧은 새 가지를 냈다.", "choices": ["(A) - (C) - (B)", "(B) - (A) - (C)", "(B) - (C) - (A)", "(C) - (A) - (B)", "(C) - (B) - (A)"], "answer": 1, "fixed": true}, {"id": "L6F5", "lv": 6, "k": "삽입", "text": "글의 흐름으로 보아, 주어진 문장이 들어가기에 가장 적절한 곳은?\n\n<b>주어진 문장</b> 그런 깡통에 맞추어, 작은 날로 뚜껑을 따 나가는 깡통따개가 비로소 나왔다.\n\n음식을 깡통에 담아 오래 두는 방법은 1810년 무렵에 나왔다. ( ① ) 처음의 깡통은 두꺼운 쇠로 만들어 무거웠고, 주로 먼 바다를 건너는 배와 군인들이 썼다. ( ② ) 놀랍게도 이 깡통을 여는 도구는 그 뒤로 오십 년 가까이 나오지 않았다. ( ③ ) 사람들은 망치와 끌로 뚜껑을 쪼갰고, 군인들은 총검으로 찔러 열었다. ( ④ ) 깡통 만드는 기술이 나아지면서, 얇은 철판으로도 음식을 지킬 만큼 단단한 깡통을 만들 수 있게 되었다. ( ⑤ ) 그토록 늦어진 것은 도구를 만들 솜씨가 모자라서가 아니라, 두꺼운 쇠 뚜껑에는 그런 작은 날이 파고들 수 없었기 때문이다.", "choices": ["①", "②", "③", "④", "⑤"], "answer": 4, "fixed": true}, {"id": "L6C3", "lv": 6, "k": "함축", "text": "밑줄 친 부분이 다음 글에서 뜻하는 바로 가장 적절한 것은?\n\n사과 농사를 처음 짓는 사람이 가장 망설이는 일은 열매 솎기다. 꽃이 진 자리마다 맺힌 어린 열매를 대여섯 개 가운데 하나만 남기고 따 내야 하기 때문이다. 아깝다고 그대로 두면 나무는 가지가 휘도록 열매를 달지만, 가을에 거두는 것은 작고 싱거운 사과들이다. 게다가 그해 기운을 다 써 버린 나무는 이듬해 꽃을 제대로 피우지 못한다. 열매 솎기가 사과 농가에서 <u>올해 농사이자 이듬해 농사</u>로 불리는 것은 이 때문이다.", "choices": ["올해 열매를 다 거두지 말고 얼마쯤 남겨 두어야 이듬해 씨앗으로 쓸 수 있다", "한 해씩 걸러 열매를 거두게 하면 나무가 쉬는 해에 힘을 되찾는다", "감당할 만큼만 열매를 남겨야 이번 가을의 맛도 다음 해의 결실도 지킨다", "가지를 쳐서 키를 낮춰 두면 올해 일손도 덜고 이듬해 열매도 따기 쉽다", "올해 열매가 작게 맺혀도 서두르지 말고 다음 해까지 기다려야 한다"], "answer": 2, "fixed": false}, {"id": "L6C12", "lv": 6, "k": "함축", "text": "밑줄 친 부분이 다음 글에서 뜻하는 바로 가장 적절한 것은?\n\n능숙한 양치기 개는 양을 거의 건드리지 않는다. 양 떼 뒤쪽에서 몸을 낮추고 천천히 다가가거나, 옆으로 비켜서서 가만히 멈춰 설 뿐이다. 양들은 개가 가까워지면 반대쪽으로 움직이고, 멀어지면 걸음을 늦춘다. 개는 이 거리를 한 걸음씩 늘리고 줄이며 떼 전체가 가는 방향과 빠르기를 조절한다. 서둘러 양 떼 속으로 뛰어드는 어린 개는 오히려 떼를 흩어 놓는다. 양치기들이 꼽는 좋은 개는 <u>양이 아니라 양과의 사이를 모는 개</u>다.", "choices": ["개가 가까워지면 양들이 반대쪽으로 움직인다는 것을 아는 개", "양들끼리의 간격을 좁혀 떼가 흩어지지 않게 지켜 주는 개", "몸을 대지 않고 다가서고 물러서며 떼의 길을 정하는 개", "양과 양치기 사이를 오가며 서로의 뜻을 이어 주는 개", "양을 건드리지 않고 멀찍이 떨어져서 지켜보기만 하는 개"], "answer": 2, "fixed": false}];
+const SET_ID = 'p1';
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbxDOZbcQhJa72ROS23_el4w1_430ipHJWQ7IS74yUwiksWFsvJhrCHSSAfFiD_9gWhJkg/exec';
+const KIND = 'pilot';
+const PREFIX = 'grouance_fallback_';
+const CIRC = '①②③④⑤';
+const _mem = {};
+const store = {
+  get(k) { try { const v = localStorage.getItem(PREFIX + k); if (v != null) return v; } catch (e) { /* 저장 막힘 */ } return _mem[k] != null ? _mem[k] : null; },
+  set(k, v) { _mem[k] = v; try { localStorage.setItem(PREFIX + k, v); } catch (e) { /* 이번 접속 동안만 기억 */ } }
+};
+let who = { name: '', school: '', grade: '', number: '' };
+const IS_TEACHER = new URLSearchParams(location.search).get('admin') === 'grouance-teacher-key';
+function el(tag, css, text) { const e = document.createElement(tag); if (css) e.style.cssText = css; if (text != null) e.textContent = text; return e; }
+function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function appHref() { return 'index.html' + (IS_TEACHER ? location.search : ''); }
+function clear() { const app = document.getElementById('app'); app.innerHTML = ''; return app; }
+function pKey() { return 'pilot:' + SET_ID + ':' + (who.school || '-') + ':' + (who.grade || '-') + ':' + (who.number || '-') + ':' + who.name; }
+
+// ---------- 들어가기: 앱과 같은 문지기 ----------
+function gate() {
+  const app = clear(); const card = el('div'); card.className = 'card';
+  card.append(el('p', 'font-size:15px;font-weight:700;margin:0 0 8px;', '🔑 먼저 그루앙스 앱에서 접속 코드를 넣어 주세요'));
+  card.append(el('p', 'font-size:13px;color:#6B7280;line-height:1.6;margin:0 0 4px;', '이 풀이는 그루앙스 앱에 등록한 학생이 풉니다. 앱에서 접속 코드를 한 번 넣으면 이 기기에서는 다시 넣지 않아도 됩니다. 그런 다음 이 주소로 다시 들어오세요.'));
+  const go = el('a', null, '그루앙스 앱으로 가기'); go.className = 'secondary'; go.href = appHref(); card.append(go); app.append(card);
+}
+function start() {
+  let open = IS_TEACHER; if (!open) open = store.get('access-code-verified') === 'true';
+  if (!open) { gate(); return; }
+  let p = null;
+  try { const r = store.get('pilot-profile'); if (r) p = JSON.parse(r); } catch (e) { p = null; }
+  if (!p || !p.name) { try { const r = store.get('margin-note-profile'); if (r) p = JSON.parse(r); } catch (e) { p = null; } }
+  if (!p || !p.name) { try { const r = store.get('device-last-profile'); if (r) p = JSON.parse(r); } catch (e) { p = null; } }
+  if (p && p.name) who = { name: p.name || '', school: p.school || '-', grade: p.grade || '-', number: p.number || '-' };
+  if (IS_TEACHER && location.hash === '#teacher') { renderTeacher(); return; }
+  askName();
+}
+function askName() {
+  const app = clear(); const card = el('div'); card.className = 'card';
+  card.append(el('p', 'font-size:14px;font-weight:700;color:#16324F;margin:0 0 4px;', '이름을 확인해 주세요'));
+  card.append(el('p', 'font-size:12.5px;color:#6B7280;margin:0 0 12px;line-height:1.55;', '앱에서 쓰는 이름 · 학교 · 학년 · 번호와 똑같이 넣어 주세요. 선생님이 문제별 정답률을 볼 때 쓰입니다.'));
+  const field = (id, label, ph, val) => {
+    const l = el('label', 'display:block;font-size:13px;font-weight:600;color:#4B5563;margin-top:10px;', label); l.htmlFor = id;
+    const i = el('input', 'width:100%;padding:11px 12px;border-radius:10px;border:1px solid #D1D5DB;margin-top:6px;font-size:14px;');
+    i.id = id; i.type = 'text'; i.placeholder = ph; i.value = val && val !== '-' ? val : ''; card.append(l, i); return i;
+  };
+  const n = field('pName', '이름 (꼭)', '예: 김민준', who.name);
+  const s = field('pSchool', '학교', '예: OO고등학교', who.school);
+  const g = field('pGrade', '학년', '예: 2', who.grade);
+  const no = field('pNumber', '반 / 번호', '예: 3반 12번', who.number);
+  const msg = el('p', 'font-size:12.5px;color:#B42318;margin:8px 0 0;min-height:1em;', '');
+  const go = el('button', null, '다음'); go.className = 'primary';
+  go.onclick = () => {
+    const p = { name: n.value.trim(), school: s.value.trim() || '-', grade: g.value.trim() || '-', number: no.value.trim() || '-' };
+    if (!p.name) { msg.textContent = '이름을 넣어 주세요.'; n.focus(); return; }
+    who = p; store.set('pilot-profile', JSON.stringify(p)); load(); intro();
+  };
+  card.append(msg, go); app.append(card);
+}
+
+// ---------- 기록 ----------
+let S = null; // { v, set, order:[id], ch:{id:[원래 번호 순서]}, a:{id:{c:고른 원래 번호, ok, ms, t}}, st, la, done, ts }
+function load() {
+  let o = null; try { const r = store.get(pKey()); if (r) o = JSON.parse(r); } catch (e) { o = null; }
+  const ids = ITEMS.map(x => x.id);
+  if (o && o.set === SET_ID && o.order && o.order.length === ids.length && ids.every(i => o.order.indexOf(i) >= 0)) { S = o; return; }
+  const ch = {}; ITEMS.forEach(x => { const idx = [0, 1, 2, 3, 4]; ch[x.id] = x.fixed ? idx : shuffle(idx); });
+  S = { v: 1, set: SET_ID, order: shuffle(ids), ch, a: {}, st: 0, la: 0, done: false, ts: 0 };
+}
+function save() { S.ts = Date.now(); try { store.set(pKey(), JSON.stringify(S)); } catch (e) { /* 저장 실패해도 이어 감 */ } pushSoon(); }
+let _timer = null, _pend = false;
+function canSync() { return !!(SHEET_URL && who.name && S && S.ts); }
+function pushSoon() { if (!canSync()) return; _pend = true; clearTimeout(_timer); _timer = setTimeout(pushNow, 1500); }
+function pushNow() {
+  if (!_pend || !canSync()) return; _pend = false; clearTimeout(_timer);
+  try {
+    const body = JSON.stringify({ action: 'save_session_state', kind: KIND, name: who.name, school: who.school, grade: who.grade, number: who.number, stateJson: JSON.stringify(S) });
+    fetch(SHEET_URL, { method: 'POST', mode: 'no-cors', keepalive: body.length < 60000, headers: { 'Content-Type': 'text/plain' }, body }).catch(() => { _pend = true; });
+  } catch (e) { _pend = true; }
+}
+addEventListener('pagehide', pushNow);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') pushNow(); });
+async function sheetPost(body, ms) {
+  const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = ctl ? setTimeout(() => ctl.abort(), ms || 8000) : null;
+  try { const res = await fetch(SHEET_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body), signal: ctl ? ctl.signal : undefined }); return await res.json(); }
+  finally { if (timer) clearTimeout(timer); }
+}
+
+// ---------- 학생 화면 ----------
+function intro() {
+  const answered = Object.keys(S.a).length;
+  if (S.done) { finish(); return; }
+  const app = clear(); const card = el('div'); card.className = 'card';
+  card.append(el('p', 'font-size:15px;font-weight:700;color:#16324F;margin:0 0 8px;', who.name + ' 학생'));
+  const lines = ['모두 20문제이고 15분쯤 걸립니다.', '문제마다 보기 다섯 개 가운데 가장 알맞은 하나를 고르세요.', '한 문제를 풀면 바로 다음 문제로 넘어가며, 정답은 보여 주지 않습니다.', '이 풀이는 점수나 레벨에 들어가지 않습니다.'];
+  const ul = el('ul', 'margin:0 0 4px 18px;padding:0;font-size:13.5px;line-height:1.8;color:#374151;'); lines.forEach(t => ul.append(el('li', null, t))); card.append(ul);
+  if (answered) card.append(el('p', 'font-size:13px;color:#0F6E56;margin:10px 0 0;', '이어 풀기: ' + answered + '문제를 풀었습니다.'));
+  const go = el('button', null, answered ? '이어서 풀기' : '시작하기'); go.className = 'primary';
+  go.onclick = () => { if (!S.st) { S.st = Date.now(); S.la = S.st; save(); } question(); };
+  card.append(go);
+  const who2 = el('button', null, '이름이 틀렸어요'); who2.className = 'secondary'; who2.onclick = askName; card.append(who2);
+  app.append(card);
+}
+let _shownAt = 0;
+function question() {
+  const next = S.order.find(id => !S.a[id]);
+  if (!next) { S.done = true; save(); pushNow(); finish(); return; }
+  const it = ITEMS.find(x => x.id === next), n = Object.keys(S.a).length + 1;
+  const app = clear(); const card = el('div'); card.className = 'card';
+  const top = el('div', 'display:flex;justify-content:space-between;align-items:center;');
+  const b = el('span', null, n + ' / ' + ITEMS.length); b.className = 'badge'; top.append(b); card.append(top);
+  const bar = el('div'); bar.className = 'bar'; const fill = el('div', 'width:' + Math.round((n - 1) / ITEMS.length * 100) + '%;'); bar.append(fill); card.append(bar);
+  const parts = it.text.split('\n\n'); const stem = parts.shift();
+  card.append(el('p', 'font-size:14px;font-weight:700;color:#16324F;margin:12px 0 0;', stem));
+  const ps = el('div'); ps.className = 'passage'; ps.innerHTML = parts.join('\n\n'); card.append(ps);
+  let pick = -1; const btns = [];
+  const go = el('button', null, n === ITEMS.length ? '마치기' : '다음 문제'); go.className = 'primary'; go.disabled = true;
+  S.ch[it.id].forEach((orig, pos) => {
+    const c = el('button'); c.className = 'choice'; c.type = 'button';
+    c.textContent = it.fixed ? it.choices[orig] : CIRC[pos] + ' ' + it.choices[orig];
+    c.onclick = () => { pick = orig; btns.forEach(x => x.classList.remove('on')); c.classList.add('on'); go.disabled = false; };
+    btns.push(c); card.append(c);
+  });
+  go.onclick = () => {
+    if (pick < 0) return; go.disabled = true;
+    const now = Date.now(); S.a[it.id] = { c: pick, ok: pick === it.answer ? 1 : 0, ms: Math.min(now - _shownAt, 600000), t: now }; S.la = now; save();
+    window.scrollTo(0, 0); question();
+  };
+  card.append(go); app.append(card); _shownAt = Date.now(); window.scrollTo(0, 0);
+}
+function finish() {
+  const ok = Object.values(S.a).filter(x => x.ok).length;
+  const app = clear(); const card = el('div'); card.className = 'card';
+  card.append(el('p', 'font-size:16px;font-weight:700;color:#16324F;margin:0 0 8px;', '수고했습니다! 모두 풀었어요.'));
+  card.append(el('p', 'font-size:13.5px;color:#374151;line-height:1.7;margin:0;', '20문제 가운데 ' + ok + '문제를 맞혔습니다. 이 풀이는 점수나 레벨에 들어가지 않습니다. 선생님께 풀었다고 알려 주세요.'));
+  const sent = el('p', 'font-size:12px;color:#6B7280;margin:10px 0 0;', '기록을 선생님께 보내는 중…'); card.append(sent);
+  setTimeout(() => { sent.textContent = '기록을 선생님께 보냈습니다.'; }, 2500);
+  const back = el('a', null, '← 그루앙스 앱으로'); back.className = 'secondary'; back.href = appHref(); card.append(back);
+  if (IS_TEACHER) { const re = el('button', null, '(선생님) 이 이름으로 처음부터 다시 풀기'); re.className = 'secondary'; re.onclick = () => { S = null; try { localStorage.removeItem(PREFIX + pKey()); } catch (e) { /* 무시 */ } delete _mem[pKey()]; load(); S.ts = 0; intro(); }; card.append(re); }
+  app.append(card); pushNow();
+}
+
+// ---------- 선생님 화면 ----------
+let _tpw = '';
+async function teacherLogin() {
+  if (_tpw) return true;
+  const pw = prompt('선생님 모드 비밀번호를 입력하세요. (그루앙스 앱과 같은 비밀번호)'); if (pw === null) return false;
+  try { const d = await sheetPost({ action: 'teacher_login', teacherPw: pw }, 15000); if (d && d.status === 'ok' && d.teacher === true) { _tpw = pw; return true; } alert((d && d.message) || '비밀번호가 틀렸습니다.'); }
+  catch (e) { alert('비밀번호를 확인하지 못했습니다. 인터넷 연결을 확인해 주세요.'); }
+  return false;
+}
+const pct = (ok, n) => n ? Math.round(ok / n * 100) : null;
+function sec(ms) { return Math.round(ms / 1000); }
+async function renderTeacher() {
+  if (!(await teacherLogin())) { const app = clear(); const c = el('div'); c.className = 'card'; c.append(el('p', null, '선생님 비밀번호를 넣어야 볼 수 있습니다.')); const r = el('button', null, '다시 시도'); r.className = 'primary'; r.onclick = renderTeacher; c.append(r); app.append(c); return; }
+  const app = clear(); const card = el('div'); card.className = 'card'; app.append(card);
+  card.append(el('p', 'font-size:14px;font-weight:700;color:#16324F;margin:0 0 6px;', '선생님 화면 · 시범 풀이 결과'));
+  const msg = el('p', 'font-size:13px;color:#6B7280;margin:0;', '학생 목록을 불러오는 중…'); card.append(msg);
+  let profiles = [];
+  try {
+    const d = await sheetPost({ action: 'get_all_profiles', teacherPw: _tpw }, 30000);
+    if (!d || d.status !== 'ok') throw new Error((d && d.message) || '목록을 받지 못함');
+    profiles = (d.profiles || []).filter(p => p && p.name).map(p => ({ name: String(p.name), school: String(p.school == null ? '' : p.school), grade: String(p.grade == null ? '' : p.grade), number: String(p.number == null ? '' : p.number) }));
+  } catch (e) { msg.textContent = '학생 목록을 불러오지 못했습니다: ' + e.message; return; }
+  const seen = {}; profiles = profiles.filter(p => { const k = [p.school, p.grade, p.number, p.name].join(':'); if (seen[k]) return false; seen[k] = 1; return true; });
+  let done = 0;
+  const one = async p => {
+    try { const d = await sheetPost({ action: 'get_session_state', kind: KIND, name: p.name, school: p.school, grade: p.grade, number: p.number }, 20000); p.st = d && d.status === 'ok' && d.stateJson ? JSON.parse(d.stateJson) : null; }
+    catch (e) { p.st = null; p.err = true; }
+    done++; msg.textContent = '학생 ' + profiles.length + '명의 기록을 불러오는 중… ' + done + '/' + profiles.length;
+  };
+  const q = profiles.slice(); await Promise.all(Array.from({ length: 6 }, async () => { while (q.length) await one(q.shift()); }));
+  showTeacher(app, profiles);
+}
+function showTeacher(app, profiles) {
+  app.innerHTML = ''; const card = el('div'); card.className = 'card'; app.append(card);
+  const rows = profiles.filter(p => p.st && p.st.a && Object.keys(p.st.a).length);
+  const fin = rows.filter(p => p.st.done);
+  card.append(el('p', 'font-size:14px;font-weight:700;color:#16324F;margin:0 0 4px;', '선생님 화면 · 시범 풀이 결과'));
+  card.append(el('p', 'font-size:13px;color:#374151;margin:0 0 10px;line-height:1.6;', '푼 학생 ' + rows.length + '명(끝까지 푼 학생 ' + fin.length + '명). 아래 정답률은 푼 학생 모두의 답을 합친 것입니다. 한 문제를 푼 학생이 적으면 숫자가 흔들리니 한 문제에 20명 안팎이 모이면 믿을 만합니다.'));
+  const byItem = {}; ITEMS.forEach(x => byItem[x.id] = { n: 0, ok: 0, ms: 0 });
+  rows.forEach(p => Object.entries(p.st.a).forEach(([id, e]) => { const b = byItem[id]; if (b) { b.n++; b.ok += e.ok ? 1 : 0; b.ms += e.ms || 0; } }));
+  // 레벨별
+  card.append(el('p', 'font-size:13px;font-weight:700;margin:12px 0 4px;', '레벨별 정답률 (낮은 레벨일수록 높아야 정상)'));
+  const t1 = el('table'); t1.innerHTML = '<tr><th>레벨</th><th>정답률</th><th>푼 답 수</th><th>문제당 평균 시간</th></tr>';
+  const lvR = {};
+  for (let lv = 2; lv <= 6; lv++) {
+    let n = 0, ok = 0, ms = 0; ITEMS.filter(x => x.lv === lv).forEach(x => { const b = byItem[x.id]; n += b.n; ok += b.ok; ms += b.ms; });
+    lvR[lv] = pct(ok, n);
+    const tr = el('tr'); tr.innerHTML = '<td>레벨 ' + lv + '</td><td><b>' + (lvR[lv] == null ? '—' : lvR[lv] + '%') + '</b></td><td>' + n + '</td><td>' + (n ? sec(ms / n) + '초' : '—') + '</td>'; t1.append(tr);
+  }
+  card.append(t1);
+  const ord = []; for (let lv = 3; lv <= 6; lv++) if (lvR[lv - 1] != null && lvR[lv] != null) ord.push('레벨 ' + (lv - 1) + ' → ' + lv + ': ' + (lvR[lv] <= lvR[lv - 1] ? '벌어짐 ' + (lvR[lv - 1] - lvR[lv]) + '%p' : '거꾸로 ' + (lvR[lv] - lvR[lv - 1]) + '%p'));
+  if (ord.length) card.append(el('p', 'font-size:12.5px;color:#374151;margin:8px 0 0;line-height:1.7;', ord.join('  ·  ')));
+  // 문제별
+  card.append(el('p', 'font-size:13px;font-weight:700;margin:16px 0 4px;', '문제별 정답률'));
+  const t2 = el('table'); t2.innerHTML = '<tr><th>레벨</th><th>문제</th><th>유형</th><th>정답률</th><th>푼 수</th><th>가장 많이 고른 틀린 보기</th></tr>';
+  ITEMS.slice().sort((a, b) => a.lv - b.lv || a.id.localeCompare(b.id)).forEach(x => {
+    const b = byItem[x.id]; const cnt = {};
+    rows.forEach(p => { const e = p.st.a[x.id]; if (e && !e.ok) cnt[e.c] = (cnt[e.c] || 0) + 1; });
+    const top = Object.entries(cnt).sort((a, b2) => b2[1] - a[1])[0];
+    const wrong = top ? (x.choices[+top[0]].slice(0, 40) + ' (' + top[1] + '명)') : '—';
+    const r = pct(b.ok, b.n); const tr = el('tr');
+    tr.innerHTML = '<td>' + x.lv + '</td><td>' + x.id + '</td><td>' + x.k + '</td><td style="color:' + (r == null ? '#6B7280' : r >= 80 ? '#137333' : r >= 60 ? '#B06000' : '#B42318') + ';font-weight:700;">' + (r == null ? '—' : r + '%') + '</td><td>' + b.n + '</td><td>' + wrong.replace(/</g, '&lt;') + '</td>'; t2.append(tr);
+  });
+  card.append(t2);
+  // 학생별
+  card.append(el('p', 'font-size:13px;font-weight:700;margin:16px 0 4px;', '학생별'));
+  const t3 = el('table'); t3.innerHTML = '<tr><th>이름</th><th>학교 · 학년 · 번호</th><th>푼 수</th><th>맞힌 수</th><th>끝</th></tr>';
+  rows.sort((a, b) => a.name.localeCompare(b.name)).forEach(p => {
+    const v = Object.values(p.st.a); const tr = el('tr');
+    tr.innerHTML = '<td>' + p.name.replace(/</g, '&lt;') + '</td><td>' + [p.school, p.grade, p.number].filter(x => x && x !== '-').join(' · ').replace(/</g, '&lt;') + '</td><td>' + v.length + '</td><td>' + v.filter(x => x.ok).length + '</td><td>' + (p.st.done ? '✓' : '') + '</td>'; t3.append(tr);
+  });
+  card.append(t3);
+  const re = el('button', null, '다시 불러오기'); re.className = 'primary'; re.onclick = renderTeacher; card.append(re);
+}
+start();
+</script>
+</body>
+</html>
