@@ -5468,7 +5468,9 @@ function selectTraining(correct, word, correctText, questionText, studentAnswerT
     const speakExplainBtn = document.createElement('button');
     speakExplainBtn.style.cssText = 'background:#EEF2FF;color:#3730A3;border:1px solid #C7D2FE;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;margin:4px 4px 8px 0;';
     speakExplainBtn.textContent = '🔊 정답 설명 듣기';
-    speakExplainBtn.onclick = () => speakText(`이 문제의 정답은 ${correctText} 였어요. 왜 그런지 한번 다시 살펴볼까요?`);
+    // 풀이 소리는 없으므로, 해설 화면이 있을 때만 거기서 이유를 보라고 안내한다 (없으면 정답만 말함)
+    const _hasExplScreen = !!lastTypeExplain;
+    speakExplainBtn.onclick = () => speakText(`이 문제의 정답은 ${correctText} 였어요.` + (_hasExplScreen ? ' 화면의 해설 보기를 눌러 이유를 확인해 보세요.' : ''));
     document.querySelector('.card').appendChild(speakExplainBtn);
 
     const askAiBtn = document.createElement('button');
