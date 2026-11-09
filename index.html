@@ -5098,6 +5098,29 @@ try {
   }
 } catch (e) {}
 
+// 글자 종류별로 나누어 읽기 (2026-11-09)
+// 예전에는 문장에 한글이 한 글자라도 있으면 통째로 한국어 음성으로 읽어서, 안에 든 영어 낱말이 한글 발음처럼 들렸다.
+// 이제 한글 덩어리는 한국어 음성, 영어 덩어리는 영어 음성으로 나누어 차례로 읽는다.
+// 숫자 · 문장부호 · 공백은 앞 덩어리에 붙인다. 한글만 있는 글 · 영어만 있는 글은 예전과 똑같이 한 번에 읽는다.
+function splitByScript(text) {
+  const runs = [];
+  let cur = null, lead = '';
+  for (const ch of String(text)) {
+    let kind = null;
+    if (/[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(ch)) kind = 'ko';
+    else if (/[A-Za-z]/.test(ch)) kind = 'en';
+    if (kind === null) {
+      if (cur) cur.text += ch; else lead += ch;
+    } else if (cur && cur.kind === kind) {
+      cur.text += ch;
+    } else {
+      cur = { kind: kind, text: (runs.length === 0 ? lead : '') + ch };
+      runs.push(cur);
+    }
+  }
+  return runs;
+}
+
 function speakText(text) {
   try {
     if (!('speechSynthesis' in window)) {
@@ -5114,19 +5137,24 @@ function speakText(text) {
       .trim();
     if (!cleanText) return;
 
-    const hasKorean = /[가-힣]/.test(cleanText);
-    const utter = new SpeechSynthesisUtterance(cleanText);
-    utter.lang = hasKorean ? 'ko-KR' : 'en-US';
+    const runs = splitByScript(cleanText);
+    for (const run of runs) {
+      const piece = run.text.trim();
+      if (!piece) continue;
+      const isKo = run.kind === 'ko';
+      const utter = new SpeechSynthesisUtterance(piece);
+      utter.lang = isKo ? 'ko-KR' : 'en-US';
 
-    const chosen = hasKorean ? _cachedVoice.ko : _cachedVoice.en;
-    if (chosen) utter.voice = chosen;
+      const chosen = isKo ? _cachedVoice.ko : _cachedVoice.en;
+      if (chosen) utter.voice = chosen;
 
-    // 톤 설정: 또박또박 읽되 기계적이지 않게, 살짝 느긋하고 부드럽게
-    utter.rate = hasKorean ? 0.98 : 0.92;
-    utter.pitch = 1.05;   // 아주 살짝 높여 딱딱함을 덜어냄
-    utter.volume = 1;
+      // 톤 설정: 또박또박 읽되 기계적이지 않게, 살짝 느긋하고 부드럽게
+      utter.rate = isKo ? 0.98 : 0.92;
+      utter.pitch = 1.05;   // 아주 살짝 높여 딱딱함을 덜어냄
+      utter.volume = 1;
 
-    window.speechSynthesis.speak(utter);
+      window.speechSynthesis.speak(utter);   // 대기열에 차례로 들어가 순서대로 읽힌다
+    }
   } catch (e) {
     // 실패해도 학습 흐름은 막지 않음
   }
