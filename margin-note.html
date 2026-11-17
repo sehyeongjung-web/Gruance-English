@@ -139,7 +139,7 @@ async function sumLoad() {
 function sumSave() { try { appStorage.set(sumKey(), JSON.stringify(sumState), true); } catch (e) { /* 저장 실패해도 연습은 이어 감 */ } mnPushSoon(); }
 
 // ===== 선생님 화면용 기록 — 구글 시트 「진행상태」 탭에 종류 marginnote로 한 줄(학생마다) =====
-// 기록 꼴: c · w · p(문항별 {c 마지막 결과, n 푼 횟수, k 맞힌 횟수, f 첫 결과, t 때}) · d(날짜별 [고르기 푼 수, 고르기 맞힌 수, 쓰기 수, 단락 수, 공부 초])
+// 기록 꼴: c · w · p(문항별 {c 마지막 결과, n 푼 횟수, k 맞힌 횟수, f 첫 결과, t 때, w 마지막으로 틀리게 고른 보기(고르기만)}) · d(날짜별 [고르기 푼 수, 고르기 맞힌 수, 쓰기 수, 단락 수, 공부 초])
 //          · x(최근 틀린 고르기 [때, 문항, 고른 답]) · set(고른 묶음) · ts(마지막 기록 때) · la(마지막으로 답한 때)
 const MN_SHEET_URL = 'https://script.google.com/macros/s/AKfycbxDOZbcQhJa72ROS23_el4w1_430ipHJWQ7IS74yUwiksWFsvJhrCHSSAfFiD_9gWhJkg/exec';
 const MN_KIND = 'marginnote';
@@ -162,6 +162,7 @@ function mnRecordChoose(it, ok, chosenText) {
   const k0 = prev ? (prev.k != null ? prev.k : (prev.c ? 1 : 0)) : 0;
   const f0 = prev ? (prev.f != null ? prev.f : (prev.c ? 1 : 0)) : (ok ? 1 : 0);
   sumState.c[it.id] = { c: ok, n: ((prev && prev.n) || 0) + 1, k: k0 + (ok ? 1 : 0), f: f0, t: Date.now() };
+  const w0 = ok ? (prev && prev.w) : String(chosenText || '').slice(0, 60); if (w0) sumState.c[it.id].w = w0; // 마지막으로 틀리게 고른 보기(오답 노트용, 2026-11-17)
   if (!ok) { const x = sumState.x = sumState.x || []; x.push([Date.now(), it.id, String(chosenText || '').slice(0, 60)]); if (x.length > MN_X_MAX) x.splice(0, x.length - MN_X_MAX); }
   mnTally('c', ok); sumSave();
 }
@@ -321,6 +322,13 @@ async function renderSumMenu() {
   card.append(prac('연습 1 · 한 문장 — 축약어 고르기', B.choose, line(sc, '문항') + ` · 한 번에 ${SUM_ROUND}문항씩 섞어서`, () => sumStartRound('c')));
   card.append(prac('연습 2 · 한 문장 — 축약어 직접 쓰기', B.write, line(sw, '문항') + ' · 쓰고 나서 모범 답과 견줘요', () => sumStartRound('w')));
   card.append(prac('연습 3 · 단락 — 문장마다 줄이고 주제 찾기', B.paras, line(sp, '단락') + ' · 역할 · 축약어 · 한 줄 · 주제 문제', renderSumParaMenu));
+  { // 틀린 문제 다시 보기(오답 노트, 2026-11-17)
+    const W = sumWrongLists(); const left = W.c.open.length + W.w.open.length + W.p.open.length, fixed = W.c.fixed.length + W.w.fixed.length + W.p.fixed.length;
+    const wb = btn('틀린 문제 다시 보기 · 오답 노트', left ? `아직 못 고친 문제 ${left}개${fixed ? ` · 고친 문제 ${fixed}개` : ''} · 친절한 설명과 함께 다시 풀어요` : fixed ? `틀렸던 문제를 모두 고쳤어요(${fixed}개) · 설명을 다시 볼 수 있어요` : '아직 틀린 문제가 없어요', renderSumWrong);
+    wb.id = 'mnWrongBtn'; wb.style.borderColor = left ? '#F3C2C2' : '#E5E7EB'; wb.style.background = left ? '#FFF8F8' : '#fff';
+    if (!left && !fixed) { wb.disabled = true; wb.style.opacity = '.55'; wb.style.cursor = 'default'; wb.onclick = null; }
+    card.append(wb);
+  }
   const who = myEl('button', null, studentName ? `${studentName}님이 아니에요 (이름 바꾸기)` : '이름 넣기'); who.className = 'secondary'; who.onclick = mnAskName; card.append(who);
   if (MN_TEACHER) { const t = myEl('button', null, '👩‍🏫 선생님 화면 — 학생들의 여백 노트 기록'); t.className = 'primary'; t.id = 'mnTeacherBtn'; t.style.marginTop = '8px'; t.onclick = renderMnTeacher; card.append(t); }
   app.append(card);
@@ -442,11 +450,130 @@ function sumRenderEnd() {
     card.append(myEl('p', 'font-size:13px;color:#374151;margin:8px 0 4px;', '놓친 문장은 핵심이 이런 깊이에 숨어 있었어요.'));
     steps.forEach(k => card.append(myEl('div', 'font-size:13px;color:#374151;margin:2px 0;', `· ${SUM_STEP_NAME[k] || k} — ${R.miss[k]}문항`)));
   } else {
-    card.append(myEl('p', 'font-size:13px;color:#374151;margin:8px 0 4px;', '모두 맞혔어요. 다음 판에서는 아직 안 푼 문장이 먼저 나와요.'));
+    card.append(myEl('p', 'font-size:13px;color:#374151;margin:8px 0 4px;', R.review ? '틀렸던 문제를 이번에는 모두 맞혔어요. 잘했어요!' : '모두 맞혔어요. 다음 판에서는 아직 안 푼 문장이 먼저 나와요.'));
   }
   const again = myEl('button', null, `한 판 더 (${SUM_ROUND}문항)`); again.className = 'primary'; again.onclick = () => sumStartRound(R.kind);
   const menu = myEl('button', null, '목록'); menu.className = 'secondary'; menu.onclick = renderSumMenu;
-  card.append(again, menu);
+  if (R.review) { again.textContent = '오답 노트로 돌아가기'; again.onclick = renderSumWrong; card.append(again, menu); }
+  else if (steps.length) { const wr = myEl('button', null, '방금 틀린 문제 다시 보기 (오답 노트)'); wr.className = 'secondary'; wr.id = 'mnEndWrong'; wr.onclick = renderSumWrong; card.append(again, wr, menu); }
+  else card.append(again, menu);
+  sumNavCard(app);
+}
+
+// ===== 틀린 문제 다시 보기 · 오답 노트 (2026-11-17, 선생님 말씀 「학생이 틀린 문제를 다시 볼 수 있게 · 친절한 설명도」) =====
+// 지금 고른 묶음에서 틀린 적이 있는 문항을 모은다. open = 아직 못 고친 것(마지막 결과가 틀림), fixed = 다시 풀어 맞힌 것.
+// 고르기: 틀린 적 = 푼 횟수 > 맞힌 횟수. 쓰기: 스스로 「반만 맞았어요 · 다시 볼래요」로 매긴 것. 단락: 주제 문제를 틀린 것.
+function sumWrongLists() {
+  const B = sumBank(), st = sumState || { c: {}, w: {}, p: {} };
+  const split = (list, rec, everWrong) => { const open = [], fixed = []; list.forEach(it => { const e = rec[it.id]; if (!e) return; if (!e.c) open.push(it); else if (everWrong(e)) fixed.push(it); }); const byT = (a, b) => (rec[b.id].t || 0) - (rec[a.id].t || 0); open.sort(byT); fixed.sort(byT); return { open, fixed }; };
+  return {
+    c: split(B.choose, st.c || {}, e => (e.n || 1) - (e.k != null ? e.k : (e.c ? 1 : 0)) > 0),
+    w: split(B.write, st.w || {}, () => false),
+    p: split(B.paras, st.p || {}, () => false)
+  };
+}
+// 마지막으로 틀리게 고른 보기: 문항 기록의 w, 없으면 최근 틀린 답 목록(x)에서 찾음
+function sumLastWrongPick(it) {
+  const e = sumState.c[it.id]; let t = e && e.w;
+  if (!t) { const x = sumState.x || []; for (let i = x.length - 1; i >= 0; i--) if (x[i][1] === it.id) { t = x[i][2]; break; } }
+  if (!t) return null;
+  const hit = it.tr.find(o => o[0] === t) || it.tr.find(o => o[0].slice(0, 60) === t);
+  return hit ? { t: hit[0], why: hit[1] } : null;
+}
+// 친절한 설명 한 덩어리: 내가 고른 답은 왜 아닐까 → 정답 → 문장 해석 · 낱말 → 이렇게 읽어요 → 다른 보기
+function sumWrongExplain(it) {
+  const box = myEl('div', 'margin-top:8px;border-radius:10px;padding:12px 13px;line-height:1.7;font-size:13.5px;color:#1F2937;background:#FFFBF5;border:1px solid #F1DDBF;');
+  const lab = (t, col) => myEl('div', `font-size:12px;font-weight:700;color:${col || '#0F766E'};margin:10px 0 3px;`, t);
+  const white = t => myEl('div', 'background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:8px 10px;white-space:pre-line;', t);
+  const mine = sumLastWrongPick(it);
+  if (mine) {
+    const l = lab('내가 고른 답', '#B42318'); l.style.marginTop = '0'; box.append(l);
+    box.append(myEl('div', 'background:#FDECEC;border:1px solid #F3C2C2;border-radius:8px;padding:8px 10px;font-weight:600;', `「${mine.t}」`));
+    box.append(lab('왜 아닐까요', '#B42318')); box.append(white(mine.why));
+  }
+  const l2 = lab('정답', '#1E7B3A'); if (!mine) l2.style.marginTop = '0'; box.append(l2);
+  box.append(myEl('div', 'background:#E7F6EC;border:1px solid #B7E1C3;border-radius:8px;padding:8px 10px;font-weight:600;', `「${it.a}」`));
+  if (it.ko) { box.append(lab('문장 해석')); box.append(white(it.ko)); }
+  if (it.voc && it.voc.length) { box.append(lab('낱말')); const v = myEl('div', 'background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:8px 10px;font-size:13px;'); it.voc.forEach(p => { const r = myEl('div'); r.append(myEl('b', null, p[0]), ' — ' + p[1]); v.append(r); }); box.append(v); }
+  box.append(lab('이렇게 읽어요')); box.append(white(it.why));
+  const rest = it.tr.filter(o => !mine || o[0] !== mine.t);
+  if (rest.length) { box.append(lab(mine ? '다른 보기는 왜 아닐까요' : '틀린 보기는 왜 아닐까요')); const r = myEl('div', 'background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:8px 10px;'); rest.forEach((o, i) => r.append(myEl('div', i ? 'margin-top:6px;' : '', `「${o[0]}」 — ${o[1]}`))); box.append(r); }
+  box.append(myEl('div', 'font-size:12px;color:#6B7280;margin-top:8px;', `이 문장의 신호: ${it.dev}` + (SUM_STEP_NAME[it.k] ? ` · ${SUM_STEP_NAME[it.k]}` : '')));
+  return box;
+}
+let _sumWrongTab = 'open';
+function sumStartWrongRound(kind, list) {
+  if (!list.length) return;
+  sumRound = { kind, list: shuffleArr(list).slice(0, SUM_ROUND), i: 0, score: 0, half: 0, miss: {}, review: true };
+  sumRenderItem();
+}
+function renderSumWrong() {
+  const W = sumWrongLists();
+  const { app, card } = sumShell(`여백 노트 ${SUM_SET_NAME[sumSet]} · 틀린 문제 다시 보기`, '');
+  const nOpen = W.c.open.length + W.w.open.length + W.p.open.length, nFixed = W.c.fixed.length + W.w.fixed.length + W.p.fixed.length;
+  card.append(myEl('p', 'font-size:15px;font-weight:700;color:#16324F;margin:0 0 4px;', nOpen ? `아직 못 고친 문제 ${nOpen}개` : '틀렸던 문제를 모두 고쳤어요'));
+  card.append(myEl('p', 'font-size:12.5px;color:#6B7280;margin:0 0 10px;line-height:1.65;', '틀려도 괜찮아요. 틀린 문제가 실력이 느는 자리예요. 먼저 다시 풀어 보고, 그다음 「설명 보기」를 눌러 읽으면 더 오래 남아요. 다시 풀어 맞히면 「고친 문제」로 옮겨 가요.'));
+  if (W.c.open.length) { const b = myEl('button', null, `틀린 고르기 문제 다시 풀기 (${Math.min(SUM_ROUND, W.c.open.length)}문항)`); b.className = 'primary'; b.id = 'mnWrongRetryC'; b.style.marginTop = '0'; b.onclick = () => sumStartWrongRound('c', W.c.open); card.append(b); }
+  if (W.w.open.length) { const b = myEl('button', null, `다시 볼 쓰기 문제 다시 쓰기 (${Math.min(SUM_ROUND, W.w.open.length)}문항)`); b.className = 'secondary'; b.id = 'mnWrongRetryW'; b.onclick = () => sumStartWrongRound('w', W.w.open); card.append(b); }
+  // 아직 못 고친 것 / 고친 것
+  if (!nOpen) _sumWrongTab = 'fixed';
+  const seg = myEl('div', 'display:flex;gap:6px;margin:14px 0 10px;');
+  [['open', `아직 못 고친 문제 ${nOpen}`], ['fixed', `고친 문제 ${nFixed}`]].forEach(([k, t]) => {
+    const on = _sumWrongTab === k;
+    const b = myEl('button', `flex:1;margin:0;padding:8px 4px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid #16324F;background:${on ? '#16324F' : '#fff'};color:${on ? '#fff' : '#16324F'};`, t);
+    b.id = 'mnWrongTab_' + k; b.onclick = () => { _sumWrongTab = k; renderSumWrong(); }; seg.append(b);
+  });
+  card.append(seg);
+  const tab = _sumWrongTab, C = W.c[tab], Wr = W.w[tab], Pa = W.p[tab];
+  if (!C.length && !Wr.length && !Pa.length) card.append(myEl('p', 'font-size:13px;color:#9CA3AF;margin:8px 0;', tab === 'open' ? '못 고친 문제가 없어요. 잘하고 있어요!' : '아직 고친 문제가 없어요. 틀린 문제를 다시 풀어 맞히면 여기에 모여요.'));
+  const head = t => card.append(myEl('div', 'font-size:13px;font-weight:700;color:#111827;margin:12px 0 6px;', t));
+  const itemCard = (it, metaText) => {
+    const w = myEl('div', 'border:1px solid #E5E7EB;border-radius:10px;padding:11px 12px;margin-bottom:8px;'); w.className = 'mnWrongItem';
+    w.append(myEl('div', 'font-size:11.5px;color:#6B7280;margin-bottom:6px;', metaText));
+    sumSentenceBox(w, it); w.lastChild.style.marginBottom = '8px';
+    return w;
+  };
+  const toggle = (w, make, label) => {
+    const b = myEl('button', 'width:100%;margin:0;padding:8px;border-radius:8px;border:1px solid #D1D5DB;background:#F9FAFB;color:#374151;font-size:13px;font-weight:600;cursor:pointer;', label); b.className = 'mnWrongShow';
+    let box = null; b.onclick = () => { if (box) { box.remove(); box = null; b.textContent = label; } else { box = make(); w.append(box); b.textContent = '설명 접기'; } };
+    w.append(b);
+  };
+  if (C.length) {
+    head(`연습 1 · 고르기 (${C.length}문항)`);
+    C.forEach(it => {
+      const e = sumState.c[it.id], wrong = (e.n || 1) - (e.k != null ? e.k : (e.c ? 1 : 0));
+      const w = itemCard(it, tab === 'open' ? `${e.n || 1}번 풀어 ${wrong}번 틀림` : `${wrong}번 틀렸다가 다시 풀어 맞힘`);
+      toggle(w, () => sumWrongExplain(it), '설명 보기 — 왜 틀렸는지 · 정답 찾는 법');
+      card.append(w);
+    });
+  }
+  if (Wr.length) {
+    head(`연습 2 · 직접 쓰기 (${Wr.length}문항)`);
+    Wr.forEach(it => {
+      const e = sumState.w[it.id];
+      const w = itemCard(it, e.g === 1 ? '스스로 매김: 반만 맞았어요' : '스스로 매김: 다시 볼래요');
+      toggle(w, () => {
+        const box = myEl('div', 'margin-top:8px;border-radius:10px;padding:12px 13px;line-height:1.7;font-size:13.5px;color:#1F2937;background:#F8FAFC;border:1px solid #CBD5E1;');
+        const row = (label, text, color) => { const d = myEl('div', 'margin-bottom:6px;'); d.append(myEl('span', `font-weight:700;color:${color};`, label + ' '), myEl('span', null, text)); box.append(d); };
+        row('모범 답:', it.model, '#1E7B3A'); row('이 정도면 인정:', it.accept, '#1D4ED8'); row('이렇게 쓰면 안 됨:', it.no, '#B42318');
+        box.append(myEl('div', 'font-size:12px;color:#6B7280;margin-top:4px;', `이 문장의 신호: ${it.dev}`));
+        return box;
+      }, '모범 답 보기');
+      card.append(w);
+    });
+  }
+  if (Pa.length) {
+    head(`연습 3 · 단락 — 주제 문제를 틀린 단락 (${Pa.length}개)`);
+    Pa.forEach(P => {
+      const idx = sumBank().paras.indexOf(P), e = sumState.p[P.id];
+      const b = myEl('button', 'display:block;width:100%;text-align:left;background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:11px 12px;margin-bottom:8px;cursor:pointer;');
+      b.append(myEl('div', 'font-size:14px;font-weight:700;color:#111827;', `단락 ${idx + 1} — ${P.title}`), myEl('div', 'font-size:12px;color:#6B7280;margin-top:3px;', `주제 틀림 · 역할 ${e.roles || 0}/${P.sents.length} 맞음 · 눌러서 다시 풀기(풀이가 문장마다 나와요)`));
+      b.onclick = () => sumRenderPara(P, idx); card.append(b);
+    });
+  }
+  const others = SUM_SET_KEYS.filter(k => k !== sumSet);
+  if (others.length) card.append(myEl('p', 'font-size:12px;color:#6B7280;margin:10px 0 0;line-height:1.6;', `지금 보는 것은 ${SUM_SET_NAME[sumSet]} 묶음이에요. ${others.map(k => SUM_SET_NAME[k]).join(' · ')} 묶음의 틀린 문제는 목록에서 묶음을 바꾸면 보여요.`));
+  const menu = myEl('button', null, '목록'); menu.className = 'secondary'; menu.onclick = renderSumMenu; card.append(menu);
   sumNavCard(app);
 }
 
