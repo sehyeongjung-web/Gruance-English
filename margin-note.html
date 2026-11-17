@@ -678,7 +678,7 @@ function sumParaQuestion(host, P, roleOk) {
 // 선생님 주소(?admin=…)로 들어왔을 때만 보인다. 비밀번호는 앱과 같다(구글 쪽에서 확인).
 // 학생 목록은 앱의 「진단결과」(get_all_profiles)에서 가져오고, 학생마다 「진행상태」의 marginnote 줄을 읽는다.
 // 목록에 없는 학생(레벨 테스트를 아직 안 한 학생)은 아래 「학생 찾기」로 이름 · 학교 · 학년 · 반/번호를 넣어 본다.
-let _mnTPw = '', _mnT = null; // _mnT = { at, profiles:[{name,school,grade,number,st}], group }
+let _mnTPw = '', _mnT = null; // _mnT = { at, profiles:[{name,school,grade,number,st,S 요약,G 진도}], group, sort 진도표 차례 }
 const MN_ITEM = (() => { const m = {}; Object.entries(SUM_SETS).forEach(([set, B]) => { B.choose.forEach(it => m[it.id] = { set, k: it.k, kind: 'c', it }); B.write.forEach(it => m[it.id] = { set, k: it.k, kind: 'w', it }); B.paras.forEach(P => m[P.id] = { set, kind: 'p', it: P }); }); return m; })();
 function mnAgo(ts) {
   if (!ts) return '기록 없음';
@@ -719,6 +719,98 @@ function mnBar(r, label) {
   track.append(myEl('div', `height:100%;width:${r == null ? 0 : r}%;background:${mnRateColor(r)};border-radius:6px;`));
   w.append(track, myEl('span', 'font-size:12px;color:#374151;width:44px;text-align:right;flex:none;', r == null ? '—' : r + '%'));
   return w;
+}
+
+// ===== 진도(2026-11-17) — 묶음마다 「한 번이라도 푼 문항 수 / 그 묶음 문항 수」. 지금 자료에 없는 옛 문항 번호는 세지 않는다 =====
+const MN_TOTAL = (() => { const T = {}; SUM_SET_KEYS.forEach(set => { const B = SUM_SETS[set]; const t = T[set] = { c: B.choose.length, w: B.write.length, p: B.paras.length, depth: {} }; t.all = t.c + t.w + t.p; for (let k = 1; k <= 5; k++) t.depth[k] = B.choose.filter(it => it.k === k).length + B.write.filter(it => it.k === k).length; }); return T; })();
+function mnProgress(st) {
+  const P = { sets: {}, done: 0, total: 0 };
+  SUM_SET_KEYS.forEach(set => { P.sets[set] = { c: 0, w: 0, p: 0, all: 0, depth: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }, total: MN_TOTAL[set].all }; P.total += MN_TOTAL[set].all; });
+  ['c', 'w', 'p'].forEach(f => Object.keys((st && st[f]) || {}).forEach(id => {
+    const m = MN_ITEM[id]; if (!m || m.kind !== f || !P.sets[m.set]) return;
+    const G = P.sets[m.set]; G[f]++; G.all++; P.done++; if (m.k && G.depth[m.k] != null) G.depth[m.k]++;
+  }));
+  return P;
+}
+function mnPct(done, total) { return total ? Math.round(done / total * 100) : 0; }
+function mnProgBar(done, total, color, h) {
+  const track = myEl('div', `height:${h || 10}px;background:#EEF1F5;border-radius:6px;overflow:hidden;`);
+  track.append(myEl('div', `height:100%;width:${total ? Math.min(100, done / total * 100) : 0}%;background:${color};border-radius:6px;`));
+  return track;
+}
+// 진도표: 학생 한 줄 · 묶음 한 칸. 줄을 누르면 그 학생 기록으로.
+function mnProgressTable(T, used) {
+  const box = myEl('div', 'border:1px solid #E5E7EB;border-radius:10px;padding:10px 12px;margin-bottom:12px;'); box.id = 'mnProgBox';
+  const top = myEl('div', 'display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px;');
+  top.append(myEl('div', 'font-size:13px;font-weight:700;color:#111827;', '진도표 — 학생별 푼 문항'));
+  const sortSel = myEl('select', 'padding:4px 6px;border:1px solid #D1D5DB;border-radius:8px;font-size:12px;background:#fff;'); sortSel.id = 'mnProgSort';
+  [['num', '번호 순'], ['high', '진도 높은 순'], ['low', '진도 낮은 순'], ['recent', '최근 공부 순']].forEach(([v, t]) => { const o = myEl('option', null, t); o.value = v; if (v === (T.sort || 'num')) o.selected = true; sortSel.append(o); });
+  sortSel.onchange = () => { T.sort = sortSel.value; mnRenderTeacherList(); };
+  top.append(sortSel); box.append(top);
+  box.append(myEl('div', 'font-size:11.5px;color:#6B7280;margin-bottom:6px;line-height:1.5;', '한 번이라도 푼 문항 수예요(고르기 + 쓰기 + 단락). 맞았는지는 아래 「깊이별 정답률」과 학생별 기록에서 봐요. 이름을 누르면 그 학생으로 가요.'));
+  if (!used.length) { box.append(myEl('p', 'font-size:12.5px;color:#9CA3AF;margin:4px 0 0;', '아직 여백 노트 기록이 있는 학생이 없어요.')); return box; }
+  const numKey = p => [p.school, String(p.grade).padStart(3, '0'), String(p.number).replace(/\d+/g, d => d.padStart(3, '0')), p.name].join('|');
+  const rows = used.slice();
+  const by = T.sort || 'num';
+  rows.sort(by === 'high' ? (a, b) => b.G.done - a.G.done : by === 'low' ? (a, b) => a.G.done - b.G.done : by === 'recent' ? (a, b) => b.S.ts - a.S.ts : (a, b) => numKey(a) < numKey(b) ? -1 : numKey(a) > numKey(b) ? 1 : 0);
+  const scroll = myEl('div', 'overflow-x:auto;');
+  const tb = myEl('table', 'width:100%;border-collapse:collapse;font-size:12px;min-width:430px;'); tb.id = 'mnProgTable';
+  const hr = myEl('tr');
+  const th = (t, css) => myEl('th', 'text-align:left;font-weight:600;color:#6B7280;padding:4px 6px 6px;border-bottom:1px solid #E5E7EB;white-space:nowrap;' + (css || ''), t);
+  hr.append(th('학생'), th('모두'));
+  SUM_SET_KEYS.forEach(set => hr.append(th(`${SUM_SET_NAME[set]} (${MN_TOTAL[set].all})`, 'color:' + SUM_SET_COLOR[set] + ';')));
+  hr.append(th('마지막 공부'));
+  tb.append(hr);
+  rows.forEach(p => {
+    const tr = myEl('tr', 'cursor:pointer;'); tr.className = 'mnProgRow';
+    const td = css => myEl('td', 'padding:6px;border-bottom:1px solid #F3F4F6;vertical-align:middle;' + (css || ''));
+    const n = td('white-space:nowrap;'); n.append(myEl('div', 'font-weight:700;color:#111827;font-size:12.5px;', p.name), myEl('div', 'font-size:10.5px;color:#9CA3AF;', `${p.grade} · ${p.number}`)); tr.append(n);
+    const a = td('white-space:nowrap;font-weight:700;color:#16324F;'); a.textContent = `${mnPct(p.G.done, p.G.total)}%`; a.append(myEl('div', 'font-size:10.5px;font-weight:400;color:#9CA3AF;', `${p.G.done}/${p.G.total}`)); tr.append(a);
+    SUM_SET_KEYS.forEach(set => {
+      const G = p.G.sets[set], c = td('min-width:74px;');
+      c.append(mnProgBar(G.all, G.total, SUM_SET_COLOR[set], 8));
+      c.append(myEl('div', 'font-size:11px;color:' + (G.all ? '#374151' : '#9CA3AF') + ';margin-top:2px;white-space:nowrap;', G.all >= G.total ? `다 풂 ${G.all}/${G.total}` : `${G.all}/${G.total} · ${mnPct(G.all, G.total)}%`));
+      tr.append(c);
+    });
+    const l = td(`white-space:nowrap;font-size:11.5px;color:${Date.now() - p.S.ts > 7 * 86400000 ? '#B42318' : '#6B7280'};`); l.textContent = mnAgo(p.S.ts); tr.append(l);
+    tr.onclick = () => mnRenderStudent(p);
+    tb.append(tr);
+  });
+  scroll.append(tb); box.append(scroll);
+  const idle = T.profiles.filter(p => (!T.group || mnGroupKey(p) === T.group) && !p.S.has).length;
+  if (idle) box.append(myEl('div', 'font-size:11.5px;color:#B42318;margin-top:6px;', `아직 시작하지 않은 학생 ${idle}명은 이 표에 없어요 — 화면 아래 「아직 여백 노트 기록이 없는 학생」에 이름이 있어요.`));
+  // 엑셀 · 한글에 붙일 수 있게 표를 글자로 복사
+  const cp = myEl('button', 'width:auto;margin:8px 0 0;padding:5px 10px;font-size:12px;border-radius:8px;border:1px solid #D1D5DB;background:#fff;color:#4B5563;cursor:pointer;', '진도표 복사 (엑셀에 붙이기)'); cp.id = 'mnProgCopy';
+  cp.onclick = async () => {
+    const head = ['학교', '학년', '반/번호', '이름'].concat(SUM_SET_KEYS.map(set => `${SUM_SET_NAME[set]}(${MN_TOTAL[set].all})`), ['모두(' + rows[0].G.total + ')', '진도(%)', '마지막 공부']);
+    const lines = [head.join('\t')].concat(rows.map(p => [p.school, p.grade, p.number, p.name].concat(SUM_SET_KEYS.map(set => p.G.sets[set].all), [p.G.done, mnPct(p.G.done, p.G.total), p.S.ts ? mnDay(p.S.ts) : '']).join('\t')));
+    const text = lines.join('\n');
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch (e) { try { const ta = myEl('textarea'); ta.value = text; document.body.append(ta); ta.select(); ok = document.execCommand('copy'); ta.remove(); } catch (e2) { ok = false; } }
+    cp.textContent = ok ? '복사했어요 — 엑셀에 붙여 넣으세요' : '복사하지 못했어요'; setTimeout(() => { cp.textContent = '진도표 복사 (엑셀에 붙이기)'; }, 2500);
+  };
+  box.append(cp);
+  return box;
+}
+// 학생 한 명의 진도: 묶음마다 모두 · 고르기 · 쓰기 · 단락 · 깊이별
+function mnProgressCard(p) {
+  const G = p.G || mnProgress(p.st);
+  const box = myEl('div', 'border:1px solid #E5E7EB;border-radius:10px;padding:10px 12px;margin-bottom:12px;'); box.id = 'mnStuProg';
+  box.append(myEl('div', 'font-size:13px;font-weight:700;color:#111827;margin-bottom:2px;', `진도 — 모두 ${G.done}/${G.total}문항 (${mnPct(G.done, G.total)}%)`));
+  box.append(myEl('div', 'font-size:11.5px;color:#6B7280;margin-bottom:4px;', '한 번이라도 푼 문항 수예요. 깊이 칸은 고르기 + 쓰기예요.'));
+  SUM_SET_KEYS.forEach(set => {
+    const g = G.sets[set], t = MN_TOTAL[set], col = SUM_SET_COLOR[set];
+    const sec = myEl('div', 'padding:8px 0 4px;border-top:1px dashed #E5E7EB;margin-top:6px;');
+    const hd = myEl('div', 'display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:4px;');
+    hd.append(myEl('span', 'font-size:12.5px;font-weight:700;color:' + col + ';', `${SUM_SET_NAME[set]} · ${SUM_SET_LEVEL[set] || ''}`), myEl('span', 'font-size:12px;color:#374151;', g.all >= t.all ? `다 풂 (${g.all}/${t.all})` : `${g.all}/${t.all} · ${mnPct(g.all, t.all)}% · 남은 문항 ${t.all - g.all}`));
+    sec.append(hd, mnProgBar(g.all, t.all, col, 10));
+    const line = (label, d, n) => { const w = myEl('div', 'display:flex;align-items:center;gap:6px;margin:4px 0 0;'); w.append(myEl('span', 'font-size:11.5px;color:#4B5563;width:44px;flex:none;', label)); const b = mnProgBar(d, n, col, 6); b.style.flex = '1'; b.style.opacity = '.75'; w.append(b, myEl('span', 'font-size:11.5px;color:#374151;width:52px;text-align:right;flex:none;', `${d}/${n}`)); return w; };
+    sec.append(line('고르기', g.c, t.c), line('쓰기', g.w, t.w), line('단락', g.p, t.p));
+    const grid = myEl('div', 'display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:6px;');
+    for (let k = 1; k <= 5; k++) { const d = g.depth[k], n = t.depth[k]; const full = n && d >= n; const cell = myEl('div', `border-radius:7px;padding:4px 2px;text-align:center;background:${full ? col : d ? '#F5F7FA' : '#fff'};border:1px solid ${full ? col : '#E5E7EB'};`); cell.append(myEl('div', `font-size:10px;color:${full ? '#fff' : '#6B7280'};`, `깊이 ${k}`), myEl('div', `font-size:11.5px;font-weight:600;color:${full ? '#fff' : d ? '#111827' : '#9CA3AF'};`, `${d}/${n}`)); grid.append(cell); }
+    sec.append(grid); box.append(sec);
+  });
+  return box;
 }
 
 async function mnTeacherLogin() {
@@ -763,8 +855,8 @@ async function renderMnTeacher(force) {
   const queue = profiles.slice(); const workers = [];
   for (let i = 0; i < 5; i++) workers.push((async () => { while (queue.length) await one(queue.shift()); })());
   await Promise.all(workers);
-  profiles.forEach(p => p.S = mnSummary(p.st));
-  _mnT = { at: Date.now(), profiles, group: (_mnT && _mnT.group) || '' };
+  profiles.forEach(p => { p.S = mnSummary(p.st); p.G = mnProgress(p.st); });
+  _mnT = { at: Date.now(), profiles, group: (_mnT && _mnT.group) || '', sort: (_mnT && _mnT.sort) || 'num' };
   mnRenderTeacherList();
 }
 function mnBackToMenu() { const b = myEl('button', null, '여백 노트 첫 화면으로'); b.className = 'secondary'; b.onclick = () => { if (location.hash === '#teacher') history.replaceState(null, '', location.pathname + location.search); renderSumMenu(); }; return b; }
@@ -791,6 +883,7 @@ function mnRenderTeacherList() {
   sum.append(tile('써 본 학생', `${used.length}/${list.length}`, '명'), tile('최근 7일 공부', `${weekUsed.length}명`, `${wkN}문항 · ${mnMin(wkSec)}`),
     tile('고르기 정답률', (() => { const n = used.reduce((a, p) => a + p.S.tries, 0), ok = used.reduce((a, p) => a + p.S.right, 0); const r = mnRate(ok, n); return r == null ? '—' : r + '%'; })(), '푼 횟수 전체'));
   card.append(sum);
+  card.append(mnProgressTable(T, used)); // 진도표(2026-11-17)
   // 깊이별 정답률(모든 학생을 합친 값) — 어느 깊이가 어려운지
   const dep = myEl('div', 'border:1px solid #E5E7EB;border-radius:10px;padding:10px 12px;margin-bottom:12px;');
   dep.append(myEl('div', 'font-size:13px;font-weight:700;color:#111827;margin-bottom:4px;', '깊이별 정답률 (고르기, 학생 모두 합침)'));
@@ -837,7 +930,7 @@ function mnRenderTeacherList() {
     try { const d = await mnSheetPost(Object.assign({ action: 'get_session_state', kind: MN_KIND }, p), 20000); p.st = d && d.status === 'ok' && d.stateJson ? JSON.parse(d.stateJson) : null; }
     catch (e) { fmsg.textContent = '불러오지 못했습니다.'; return; }
     if (!p.st) { fmsg.textContent = '그 학생의 여백 노트 기록이 없어요. 이름 · 학교 · 학년 · 반/번호를 앱에 넣은 그대로 썼는지 봐 주세요.'; return; }
-    p.S = mnSummary(p.st); mnRenderStudent(p);
+    p.S = mnSummary(p.st); p.G = mnProgress(p.st); mnRenderStudent(p);
   };
   find.append(fb, fmsg); card.append(find);
   card.append(mnBackToMenu());
@@ -855,6 +948,7 @@ function mnRenderStudent(p) {
   const r = mnRate(S.right, S.tries), rf = mnRate(S.first, S.uniq);
   g.append(tile('푼 문항(모두)', String(S.all.n), `공부 ${mnMin(S.all.sec)}`), tile('고르기 정답률', r == null ? '—' : r + '%', `${S.uniq}문항 · ${S.tries}번 풂`), tile('처음 풀 때 정답률', rf == null ? '—' : rf + '%', '다시 풀기 빼고'));
   card.append(g);
+  card.append(mnProgressCard(p)); // 진도(2026-11-17)
   // 깊이별
   const dep = myEl('div', 'border:1px solid #E5E7EB;border-radius:10px;padding:10px 12px;margin-bottom:12px;');
   dep.append(myEl('div', 'font-size:13px;font-weight:700;color:#111827;margin-bottom:2px;', '깊이별 정답률 (연습 1 고르기)'));
