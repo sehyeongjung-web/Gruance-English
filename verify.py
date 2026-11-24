@@ -19,6 +19,11 @@ LEN9 = {'18':160,'19':136,'20':124,'21':89,'22':101,'23':112,'24':98,'25':136,
         '44':257,'45':264}
 RATIO = {9:1.00, 8:0.80, 7:0.64, 6:0.52, 5:0.42, 4:0.34, 3:0.27, 2:0.22, 1:0.18}
 TOLERANCE = 0.35   # 목표치 대비 허용 오차
+# 칸별 목표를 따로 정한 곳 — LEN9 × RATIO보다 먼저 본다.
+# 2026-11-24 선생님 결정(인계문서 663번): 빈칸 31~34번 L7~9는 2027 수능 길이로 늘림(659 · 660번) —
+# 수능 빈칸 평균 155(2016~2025) · 167(2026 · 2027)낱말. 아래 레벨 목표는 그대로.
+LEN_OVERRIDE = {(c, lv): w for c in ('31', '32', '33', '34')
+                for lv, w in ((7, 108), (8, 138), (9, 170))}
 
 # 순서 배열 유형의 수능 표준 선택지 (나열 순서 그대로인 배열은 제외되어야 함)
 STD_ORDER = {
@@ -116,7 +121,7 @@ def check_set(code, lv, items, errors, warnings):
 
     # 9) 지문 길이 ─ 레벨 간 계단이 뒤집히지 않았는지
     if code in LEN9:
-        target = LEN9[code] * RATIO.get(int(lv), 1.0)
+        target = LEN_OVERRIDE.get((code, int(lv)), LEN9[code] * RATIO.get(int(lv), 1.0))
         avg = sum(len(it['text'].split()) for it in items) / len(items)
         if abs(avg - target) / target > TOLERANCE:
             warnings.append('%s: 평균 %.0f단어 (목표 약 %.0f단어)' % (tag, avg, target))
