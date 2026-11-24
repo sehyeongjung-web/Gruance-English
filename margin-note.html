@@ -959,16 +959,49 @@ function mnProgressCard(p) {
   return box;
 }
 
+// ===== 선생님 비밀번호 한 번만 넣기 (2026-11-24, 인계문서 669번) =====
+// 수능영어코치(index.html) · 여백 노트(margin-note.html) · 시범 시험(pilot-test.html)은 같은 주소(sehyeongjung-web.github.io)라
+// 이 기기의 브라우저 저장소를 함께 쓴다. 한 곳에서 비밀번호가 맞으면 12시간 동안 다른 곳에서도 다시 묻지 않는다.
+// 「선생님 모드 나가기」를 누르면 세 곳 모두에서 지워진다. 맞는지는 지금처럼 구글 쪽(teacher_login)이 확인한다.
+// 저장된 값이 틀리면(다른 기기에서 비밀번호를 바꾼 경우) 지우고 다시 묻는다. 세 파일의 이 토막은 똑같이 둔다.
+const GRU_TPW_KEY = 'gruance-teacher-login', GRU_TPW_HOURS = 12;
+const GRU_TPW_ASK = '선생님 모드 비밀번호를 입력하세요.\n(한 번 맞으면 이 기기에서 12시간 동안 수능영어코치 · 여백 노트 · 시범 시험 어디서나 다시 묻지 않습니다.)';
+function gruTpwLoad() {
+  try {
+    const o = JSON.parse(localStorage.getItem(GRU_TPW_KEY) || 'null');
+    if (o && typeof o.pw === 'string' && o.pw && Number(o.until) > Date.now()) return o.pw;
+    localStorage.removeItem(GRU_TPW_KEY);
+  } catch (e) { /* 저장소를 못 쓰는 브라우저 — 이번 화면에서만 기억 */ }
+  return '';
+}
+function gruTpwSave(pw) { try { localStorage.setItem(GRU_TPW_KEY, JSON.stringify({ pw: pw, until: Date.now() + GRU_TPW_HOURS * 3600000 })); } catch (e) { /* 무시 */ } }
+function gruTpwClear() { try { localStorage.removeItem(GRU_TPW_KEY); } catch (e) { /* 무시 */ } }
+// check(pw) → { ok, msg, net }. 저장된 값이 맞으면 묻지 않고 그 값을, 아니면 한 번 물어 맞은 값을 돌려준다(취소 · 틀림이면 null).
+async function gruTpwLogin(check) {
+  const saved = gruTpwLoad();
+  if (saved) {
+    const r = await check(saved);
+    if (r.ok) return saved;
+    if (!r.net) gruTpwClear(); // 비밀번호가 바뀌었음 → 지우고 묻기(연결 문제면 지우지 않음)
+  }
+  const pw = prompt(GRU_TPW_ASK);
+  if (pw === null) return null;
+  const r = await check(pw);
+  if (!r.ok) { alert(r.msg); return null; }
+  gruTpwSave(pw);
+  return pw;
+}
 async function mnTeacherLogin() {
   if (_mnTPw) return true;
-  const pw = prompt('선생님 모드 비밀번호를 입력하세요. (그루앙스 앱과 같은 비밀번호)');
-  if (pw === null) return false;
-  try {
-    const data = await mnSheetPost({ action: 'teacher_login', teacherPw: pw }, 15000);
-    if (data && data.status === 'ok' && data.teacher === true) { _mnTPw = pw; return true; }
-    alert((data && data.message) || '비밀번호가 틀렸습니다.');
-  } catch (e) { alert('비밀번호를 확인하지 못했습니다. 인터넷 연결을 확인해 주세요.'); }
-  return false;
+  const pw = await gruTpwLogin(async (v) => {
+    try {
+      const data = await mnSheetPost({ action: 'teacher_login', teacherPw: v }, 15000);
+      if (data && data.status === 'ok' && data.teacher === true) return { ok: true };
+      return { ok: false, msg: (data && data.message) || '비밀번호가 틀렸습니다.' };
+    } catch (e) { return { ok: false, net: true, msg: '비밀번호를 확인하지 못했습니다. 인터넷 연결을 확인해 주세요.' }; }
+  });
+  if (!pw) return false;
+  _mnTPw = pw; return true;
 }
 function mnTeacherShell(title) {
   _mnOnMenu = false;
@@ -1011,6 +1044,20 @@ function mnRenderTeacherList() {
   const T = _mnT; const { card, head } = mnTeacherShell('선생님 화면 · 여백 노트');
   const re = myEl('button', 'width:auto;margin:0;padding:4px 10px;font-size:12px;border-radius:8px;border:1px solid #D1D5DB;background:#fff;color:#4B5563;cursor:pointer;', '새로 불러오기');
   re.onclick = () => renderMnTeacher(true); head.append(re);
+  { // 비밀번호 바꾸기(앱의 바꾸기 화면으로) · 나가기(세 선생님 화면 모두에서 비밀번호를 지움) — 669번
+    const row = myEl('div', 'display:flex;gap:8px;margin:0 0 10px;');
+    const small = 'flex:1;margin:0;padding:8px 6px;font-size:12.5px;border-radius:10px;border:1px solid #16324F;background:#fff;color:#16324F;font-weight:600;cursor:pointer;';
+    const ch = myEl('button', small, '🔑 비밀번호 바꾸기'); ch.id = 'mnTpwChange';
+    ch.onclick = () => { location.href = mnAppHref() + '#teacher-pw'; };
+    const out = myEl('button', small, '🚪 선생님 모드 나가기'); out.id = 'mnTpwOut';
+    out.onclick = () => {
+      gruTpwClear(); _mnTPw = ''; _mnT = null;
+      alert('이 기기에서 선생님 모드를 나갔습니다. 수능영어코치 · 여백 노트 · 시범 시험 모두 다음에 들어올 때 비밀번호를 다시 넣습니다.');
+      if (location.hash === '#teacher') history.replaceState(null, '', location.pathname + location.search);
+      renderSumMenu();
+    };
+    row.append(ch, out); card.append(row);
+  }
   const groups = Array.from(new Set(T.profiles.map(mnGroupKey))).sort();
   const list = T.profiles.filter(p => !T.group || mnGroupKey(p) === T.group);
   const used = list.filter(p => p.S.has), weekUsed = used.filter(p => p.S.week.n > 0);

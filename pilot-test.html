@@ -193,12 +193,49 @@ function finish() {
 
 // ---------- 선생님 화면 ----------
 let _tpw = '';
+// ===== 선생님 비밀번호 한 번만 넣기 (2026-11-24, 인계문서 669번) =====
+// 수능영어코치(index.html) · 여백 노트(margin-note.html) · 시범 시험(pilot-test.html)은 같은 주소(sehyeongjung-web.github.io)라
+// 이 기기의 브라우저 저장소를 함께 쓴다. 한 곳에서 비밀번호가 맞으면 12시간 동안 다른 곳에서도 다시 묻지 않는다.
+// 「선생님 모드 나가기」를 누르면 세 곳 모두에서 지워진다. 맞는지는 지금처럼 구글 쪽(teacher_login)이 확인한다.
+// 저장된 값이 틀리면(다른 기기에서 비밀번호를 바꾼 경우) 지우고 다시 묻는다. 세 파일의 이 토막은 똑같이 둔다.
+const GRU_TPW_KEY = 'gruance-teacher-login', GRU_TPW_HOURS = 12;
+const GRU_TPW_ASK = '선생님 모드 비밀번호를 입력하세요.\n(한 번 맞으면 이 기기에서 12시간 동안 수능영어코치 · 여백 노트 · 시범 시험 어디서나 다시 묻지 않습니다.)';
+function gruTpwLoad() {
+  try {
+    const o = JSON.parse(localStorage.getItem(GRU_TPW_KEY) || 'null');
+    if (o && typeof o.pw === 'string' && o.pw && Number(o.until) > Date.now()) return o.pw;
+    localStorage.removeItem(GRU_TPW_KEY);
+  } catch (e) { /* 저장소를 못 쓰는 브라우저 — 이번 화면에서만 기억 */ }
+  return '';
+}
+function gruTpwSave(pw) { try { localStorage.setItem(GRU_TPW_KEY, JSON.stringify({ pw: pw, until: Date.now() + GRU_TPW_HOURS * 3600000 })); } catch (e) { /* 무시 */ } }
+function gruTpwClear() { try { localStorage.removeItem(GRU_TPW_KEY); } catch (e) { /* 무시 */ } }
+// check(pw) → { ok, msg, net }. 저장된 값이 맞으면 묻지 않고 그 값을, 아니면 한 번 물어 맞은 값을 돌려준다(취소 · 틀림이면 null).
+async function gruTpwLogin(check) {
+  const saved = gruTpwLoad();
+  if (saved) {
+    const r = await check(saved);
+    if (r.ok) return saved;
+    if (!r.net) gruTpwClear(); // 비밀번호가 바뀌었음 → 지우고 묻기(연결 문제면 지우지 않음)
+  }
+  const pw = prompt(GRU_TPW_ASK);
+  if (pw === null) return null;
+  const r = await check(pw);
+  if (!r.ok) { alert(r.msg); return null; }
+  gruTpwSave(pw);
+  return pw;
+}
 async function teacherLogin() {
   if (_tpw) return true;
-  const pw = prompt('선생님 모드 비밀번호를 입력하세요. (그루앙스 앱과 같은 비밀번호)'); if (pw === null) return false;
-  try { const d = await sheetPost({ action: 'teacher_login', teacherPw: pw }, 15000); if (d && d.status === 'ok' && d.teacher === true) { _tpw = pw; return true; } alert((d && d.message) || '비밀번호가 틀렸습니다.'); }
-  catch (e) { alert('비밀번호를 확인하지 못했습니다. 인터넷 연결을 확인해 주세요.'); }
-  return false;
+  const pw = await gruTpwLogin(async (v) => {
+    try {
+      const d = await sheetPost({ action: 'teacher_login', teacherPw: v }, 15000);
+      if (d && d.status === 'ok' && d.teacher === true) return { ok: true };
+      return { ok: false, msg: (d && d.message) || '비밀번호가 틀렸습니다.' };
+    } catch (e) { return { ok: false, net: true, msg: '비밀번호를 확인하지 못했습니다. 인터넷 연결을 확인해 주세요.' }; }
+  });
+  if (!pw) return false;
+  _tpw = pw; return true;
 }
 const pct = (ok, n) => n ? Math.round(ok / n * 100) : null;
 function sec(ms) { return Math.round(ms / 1000); }
