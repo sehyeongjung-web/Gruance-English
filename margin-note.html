@@ -408,6 +408,39 @@ function sumWriteKoVoc(box, it) {
   if (it.voc && it.voc.length) { box.append(lab('낱말')); const v = myEl('div', 'background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:8px 10px;font-size:13px;'); it.voc.forEach(p => { const r = myEl('div'); const w = myEl('b', null, p[0]); r.append(w, ' — ' + p[1]); v.append(r); }); box.append(v); }
 }
 
+// 「이렇게 쓰면 안 됨」을 안 되는 답마다 한 줄씩 나눠 보인다(689번). 글 꼴: 「답(까닭), 답(까닭)」 — 꼴이 다르면 예전처럼 한 줄로.
+function sumNoSplit(t) {
+  const out = []; let d = 0, cur = '';
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (c === '(') d++; else if (c === ')') d = Math.max(0, d - 1);
+    if (c === ',' && d === 0 && t[i + 1] === ' ' && cur.endsWith(')')) { out.push(cur); cur = ''; i++; continue; }
+    cur += c;
+  }
+  if (cur) out.push(cur);
+  const items = [];
+  for (const x of out) {
+    if (!x.endsWith(')')) return null;
+    let k = x.length - 1, n = 0;
+    for (; k >= 0; k--) { if (x[k] === ')') n++; else if (x[k] === '(') { n--; if (n === 0) break; } }
+    if (k <= 0) return null;
+    items.push([x.slice(0, k).trim(), x.slice(k + 1, -1).trim()]);
+  }
+  return items.length ? items : null;
+}
+function sumNoRows(box, text) {
+  const items = sumNoSplit(String(text || ''));
+  const d = myEl('div', 'margin-bottom:6px;');
+  if (!items) { d.append(myEl('span', 'font-weight:700;color:#B42318;', '이렇게 쓰면 안 됨: '), myEl('span', null, text)); box.append(d); return; }
+  d.append(myEl('div', 'font-weight:700;color:#B42318;', '이렇게 쓰면 안 됨:'));
+  items.forEach(([ans, why]) => {
+    const r = myEl('div', 'margin:5px 0 0;padding:6px 9px;background:#fff;border:1px solid #F3D2CE;border-left:3px solid #E5796D;border-radius:8px;');
+    r.append(myEl('div', 'font-weight:700;color:#7A271A;', '✕ ' + ans), myEl('div', 'color:#374151;font-size:13px;line-height:1.6;', why));
+    d.append(r);
+  });
+  box.append(d);
+}
+
 function sumRenderWrite(it) {
   const R = sumRound;
   const { app, card } = sumShell(`여백 노트 ${SUM_SET_NAME[sumSet]} · 직접 쓰기`, `${R.i + 1} / ${R.list.length}`);
@@ -428,7 +461,7 @@ function sumRenderWrite(it) {
     if (ta.value.trim()) row('내 답:', ta.value.trim(), '#374151');
     row('모범 답:', it.model, '#1E7B3A');
     row('이 정도면 인정:', it.accept, '#1D4ED8');
-    row('이렇게 쓰면 안 됨:', it.no, '#B42318');
+    sumNoRows(box, it.no);
     box.append(myEl('div', 'font-size:12px;color:#6B7280;margin-top:4px;', `이 문장의 신호: ${it.dev}`));
     sumWriteKoVoc(box, it);
     fb.append(box);
@@ -563,7 +596,7 @@ function renderSumWrong() {
       toggle(w, () => {
         const box = myEl('div', 'margin-top:8px;border-radius:10px;padding:12px 13px;line-height:1.7;font-size:13.5px;color:#1F2937;background:#F8FAFC;border:1px solid #CBD5E1;');
         const row = (label, text, color) => { const d = myEl('div', 'margin-bottom:6px;'); d.append(myEl('span', `font-weight:700;color:${color};`, label + ' '), myEl('span', null, text)); box.append(d); };
-        row('모범 답:', it.model, '#1E7B3A'); row('이 정도면 인정:', it.accept, '#1D4ED8'); row('이렇게 쓰면 안 됨:', it.no, '#B42318');
+        row('모범 답:', it.model, '#1E7B3A'); row('이 정도면 인정:', it.accept, '#1D4ED8'); sumNoRows(box, it.no);
         box.append(myEl('div', 'font-size:12px;color:#6B7280;margin-top:4px;', `이 문장의 신호: ${it.dev}`));
         sumWriteKoVoc(box, it);
         return box;
